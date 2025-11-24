@@ -20,20 +20,10 @@ contract MockLendingPool {
     event ReserveTokenSet(address indexed asset, address indexed aToken);
 
     /// @notice Emitted when tokens are supplied
-    event Supply(
-        address indexed asset,
-        address indexed user,
-        address indexed onBehalfOf,
-        uint256 amount
-    );
+    event Supply(address indexed asset, address indexed user, address indexed onBehalfOf, uint256 amount);
 
     /// @notice Emitted when tokens are withdrawn
-    event Withdraw(
-        address indexed asset,
-        address indexed user,
-        address indexed to,
-        uint256 amount
-    );
+    event Withdraw(address indexed asset, address indexed user, address indexed to, uint256 amount);
 
     /**
      * @notice Set the aToken address for a given reserve asset
@@ -53,12 +43,7 @@ contract MockLendingPool {
      * @param onBehalfOf The address that will receive the aTokens
      * @param referralCode Code used to register the integrator (unused in mock)
      */
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external {
         require(amount > 0, "Amount must be greater than 0");
         address aToken = reserveTokens[asset];
         require(aToken != address(0), "Reserve not initialized");
@@ -79,11 +64,7 @@ contract MockLendingPool {
      * @param to The address that will receive the underlying asset
      * @return The final amount withdrawn
      */
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) external returns (uint256) {
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
         address aToken = reserveTokens[asset];
         require(aToken != address(0), "Reserve not initialized");
 
@@ -98,10 +79,7 @@ contract MockLendingPool {
         }
 
         require(amountToWithdraw <= userBalance, "Insufficient aToken balance");
-        require(
-            amountToWithdraw <= IERC20(asset).balanceOf(address(this)),
-            "Insufficient pool liquidity"
-        );
+        require(amountToWithdraw <= IERC20(asset).balanceOf(address(this)), "Insufficient pool liquidity");
 
         // Burn aTokens from user
         MockERC20(aToken).burn(msg.sender, amountToWithdraw);
@@ -139,11 +117,7 @@ contract MockLendingPool {
 contract MockERC20 is ERC20 {
     uint8 private immutable _DECIMALS;
 
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 decimals_
-    ) ERC20(name, symbol) {
+    constructor(string memory name, string memory symbol, uint8 decimals_) ERC20(name, symbol) {
         _DECIMALS = decimals_;
     }
 

@@ -13,27 +13,19 @@ import {MockUniswapV2Pair} from "./MockUniswapV2Pair.sol";
  */
 contract MockUniswapV2Router {
     using SafeERC20 for IERC20;
-    
+
     /// @notice Mapping of token pairs to their LP token addresses
     mapping(address => mapping(address => address)) public getPair;
-    
+
     event PairCreated(address indexed token0, address indexed token1, address pair);
     event LiquidityAdded(
-        address indexed tokenA,
-        address indexed tokenB,
-        uint256 amountA,
-        uint256 amountB,
-        uint256 liquidity
+        address indexed tokenA, address indexed tokenB, uint256 amountA, uint256 amountB, uint256 liquidity
     );
     event LiquidityRemoved(
-        address indexed tokenA,
-        address indexed tokenB,
-        uint256 liquidity,
-        uint256 amountA,
-        uint256 amountB
+        address indexed tokenA, address indexed tokenB, uint256 liquidity, uint256 amountA, uint256 amountB
     );
     event Swap(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
-    
+
     /**
      * @notice Create a pair (admin sets the pair address)
      */
@@ -41,13 +33,13 @@ contract MockUniswapV2Router {
         require(tokenA != tokenB, "Identical addresses");
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(getPair[token0][token1] == address(0), "Pair exists");
-        
+
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair; // Bidirectional mapping
-        
+
         emit PairCreated(token0, token1, pair);
     }
-    
+
     /**
      * @notice Swap exact tokens for tokens (simplified 1:1 ratio for testing)
      * @param amountIn Amount of input tokens
@@ -66,29 +58,29 @@ contract MockUniswapV2Router {
     ) external returns (uint256[] memory amounts) {
         require(deadline >= block.timestamp, "Expired");
         require(path.length >= 2, "Invalid path");
-        
+
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
-        
+
         // Simplified: 1:1 swap ratio for testing
         for (uint256 i = 0; i < path.length - 1; i++) {
             amounts[i + 1] = amounts[i]; // 1:1 ratio
         }
-        
+
         require(amounts[amounts.length - 1] >= amountOutMin, "Insufficient output");
-        
+
         // Transfer input token from sender
         IERC20(path[0]).safeTransferFrom(msg.sender, address(this), amountIn);
-        
+
         // "Burn" input (just hold it for simplicity)
         // Mint output token to recipient
         MockERC20(path[path.length - 1]).mint(to, amounts[amounts.length - 1]);
-        
+
         emit Swap(path[0], path[path.length - 1], amountIn, amounts[amounts.length - 1]);
-        
+
         return amounts;
     }
-    
+
     /**
      * @notice Add liquidity to a pool
      * @param tokenA First token address
@@ -115,26 +107,26 @@ contract MockUniswapV2Router {
     ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
         require(deadline >= block.timestamp, "Expired");
         require(amountADesired >= amountAMin && amountBDesired >= amountBMin, "Insufficient amounts");
-        
+
         // Get pair address
         address pair = getPair[tokenA][tokenB];
         require(pair != address(0), "Pair does not exist");
-        
+
         // Transfer tokens from sender
         IERC20(tokenA).safeTransferFrom(msg.sender, address(this), amountADesired);
         IERC20(tokenB).safeTransferFrom(msg.sender, address(this), amountBDesired);
-        
+
         // Calculate liquidity (simplified)
         liquidity = amountADesired + amountBDesired;
-        
+
         // Mint LP tokens
         MockUniswapV2Pair(pair).mintLiquidity(to, liquidity);
-        
+
         emit LiquidityAdded(tokenA, tokenB, amountADesired, amountBDesired, liquidity);
-        
+
         return (amountADesired, amountBDesired, liquidity);
     }
-    
+
     /**
      * @notice Remove liquidity from a pool
      * @param tokenA First token address
@@ -157,61 +149,53 @@ contract MockUniswapV2Router {
         uint256 deadline
     ) external returns (uint256 amountA, uint256 amountB) {
         require(deadline >= block.timestamp, "Expired");
-        
+
         // Get pair
         address pair = getPair[tokenA][tokenB];
         require(pair != address(0), "Pair does not exist");
-        
+
         // Transfer LP tokens to pair
         IERC20(pair).safeTransferFrom(msg.sender, pair, liquidity);
-        
+
         // Burn LP tokens
         (amountA, amountB) = MockUniswapV2Pair(pair).burnLiquidity(address(this), liquidity);
         require(amountA >= amountAMin && amountB >= amountBMin, "Insufficient output");
-        
+
         // Mint underlying tokens to recipient
         MockERC20(tokenA).mint(to, amountA);
         MockERC20(tokenB).mint(to, amountB);
-        
+
         emit LiquidityRemoved(tokenA, tokenB, liquidity, amountA, amountB);
-        
+
         return (amountA, amountB);
     }
-    
+
     /**
      * @notice Get output amounts for a given input (simplified 1:1 for testing)
      * @param amountIn Input amount
      * @param path Token swap path
      * @return amounts Output amounts for each step
      */
-    function getAmountsOut(uint256 amountIn, address[] calldata path)
-        external
-        pure
-        returns (uint256[] memory amounts)
-    {
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external pure returns (uint256[] memory amounts) {
         require(path.length >= 2, "Invalid path");
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
-        
+
         // Simplified: 1:1 ratio
         for (uint256 i = 0; i < path.length - 1; i++) {
             amounts[i + 1] = amounts[i];
         }
-        
+
         return amounts;
     }
-    
+
     /**
      * @notice Quote liquidity amounts (simplified)
      */
-    function quote(uint256 amountA, uint256 reserveA, uint256 reserveB)
-        external
-        pure
-        returns (uint256 amountB)
-    {
+    function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) external pure returns (uint256 amountB) {
         require(amountA > 0, "Insufficient amount");
         require(reserveA > 0 && reserveB > 0, "Insufficient liquidity");
-        
+
         // Simplified: maintain ratio
         amountB = (amountA * reserveB) / reserveA;
     }

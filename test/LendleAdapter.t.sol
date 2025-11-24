@@ -44,11 +44,7 @@ contract LendleAdapterTest is Test {
         vault = new UniversalVault(address(usdc), address(strategyNFT));
 
         // Deploy Lendle adapter
-        lendleAdapter = new LendleAdapter(
-            address(usdc),
-            address(lendingPool),
-            address(vault)
-        );
+        lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
 
         // Whitelist adapter
         strategyNFT.setAdapterWhitelist(address(lendleAdapter), true);
@@ -85,16 +81,8 @@ contract LendleAdapterTest is Test {
 
         // Verify aTokens were received
         assertEq(shares, amount, "Should receive 1:1 aTokens");
-        assertEq(
-            lendleAdapter.getBalance(),
-            amount,
-            "Adapter should hold aTokens"
-        );
-        assertEq(
-            lendingPool.getReserveLiquidity(address(usdc)),
-            amount,
-            "Pool should hold USDC"
-        );
+        assertEq(lendleAdapter.getBalance(), amount, "Adapter should hold aTokens");
+        assertEq(lendingPool.getReserveLiquidity(address(usdc)), amount, "Pool should hold USDC");
     }
 
     /**
@@ -109,12 +97,7 @@ contract LendleAdapterTest is Test {
         ratios[0] = 10000; // 100%
 
         vm.prank(creator);
-        uint256 strategyId = strategyNFT.mintStrategy(
-            "Pure Lendle",
-            adapters,
-            ratios,
-            10
-        );
+        uint256 strategyId = strategyNFT.mintStrategy("Pure Lendle", adapters, ratios, 10);
 
         console.log("=== FULL INTEGRATION TEST ===");
         console.log("Alice balance before:", usdc.balanceOf(alice));
@@ -132,16 +115,8 @@ contract LendleAdapterTest is Test {
 
         // Verify balances
         assertEq(shares, expectedNet, "Shares should equal net amount");
-        assertEq(
-            lendleAdapter.getBalance(),
-            expectedNet,
-            "Lendle should have net deposit"
-        );
-        assertEq(
-            aUsdc.balanceOf(address(lendleAdapter)),
-            expectedNet,
-            "Adapter should hold aTokens"
-        );
+        assertEq(lendleAdapter.getBalance(), expectedNet, "Lendle should have net deposit");
+        assertEq(aUsdc.balanceOf(address(lendleAdapter)), expectedNet, "Adapter should hold aTokens");
 
         console.log("aUSDC in adapter:", aUsdc.balanceOf(address(lendleAdapter)));
         console.log("USDC in pool:", usdc.balanceOf(address(lendingPool)));
@@ -166,12 +141,7 @@ contract LendleAdapterTest is Test {
         ratios[0] = 10000;
 
         vm.prank(creator);
-        uint256 strategyId = strategyNFT.mintStrategy(
-            "Yield Strategy",
-            adapters,
-            ratios,
-            10
-        );
+        uint256 strategyId = strategyNFT.mintStrategy("Yield Strategy", adapters, ratios, 10);
 
         // Alice deposits
         vm.prank(alice);
@@ -188,11 +158,7 @@ contract LendleAdapterTest is Test {
         console.log("After yield aToken balance:", newBalance);
         console.log("Yield earned:", newBalance - initialBalance);
 
-        assertEq(
-            newBalance,
-            initialBalance + yieldAmount,
-            "Yield should increase balance"
-        );
+        assertEq(newBalance, initialBalance + yieldAmount, "Yield should increase balance");
     }
 
     /**
@@ -264,11 +230,7 @@ contract LendleAdapterTest is Test {
         uint256 bobNet = (DEPOSIT_AMOUNT * 2) - ((DEPOSIT_AMOUNT * 2) * 1) / 100;
         uint256 totalExpected = aliceNet + bobNet;
 
-        assertEq(
-            lendleAdapter.getBalance(),
-            totalExpected,
-            "Total in Lendle should match both deposits"
-        );
+        assertEq(lendleAdapter.getBalance(), totalExpected, "Total in Lendle should match both deposits");
     }
 
     /**
@@ -277,11 +239,7 @@ contract LendleAdapterTest is Test {
     function testAdapterViewFunctions() public {
         assertEq(lendleAdapter.token(), address(usdc), "Token should be USDC");
         assertEq(lendleAdapter.getAToken(), address(aUsdc), "aToken should be aUSDC");
-        assertEq(
-            lendleAdapter.getLendingPool(),
-            address(lendingPool),
-            "Pool address should match"
-        );
+        assertEq(lendleAdapter.getLendingPool(), address(lendingPool), "Pool address should match");
     }
 
     /**

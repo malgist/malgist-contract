@@ -39,17 +39,14 @@ interface IUniswapV2Router {
         uint256 deadline
     ) external returns (uint256 amountA, uint256 amountB);
 
-    function getAmountsOut(uint256 amountIn, address[] calldata path)
-        external
-        view
-        returns (uint256[] memory amounts);
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 }
 
 /**
  * @title FusionXAdapter
  * @notice Zap adapter for FusionX DEX on Mantle Network
  * @dev Takes single-sided deposits (USDC) and provides liquidity to USDC/MNT pair
- * 
+ *
  * Flow:
  * - Deposit: USDC → 50% swap to MNT → Add liquidity → Hold LP tokens
  * - Withdraw: Remove liquidity → Swap MNT to USDC → Return total USDC
@@ -105,13 +102,7 @@ contract FusionXAdapter is IAdapter {
      * @param router The Uniswap V2 router address
      * @param vault The UniversalVault address
      */
-    constructor(
-        address tokenA,
-        address tokenB,
-        address lpToken,
-        address router,
-        address vault
-    ) {
+    constructor(address tokenA, address tokenB, address lpToken, address router, address vault) {
         _TOKEN_A = IERC20(tokenA);
         _TOKEN_B = IERC20(tokenB);
         _LP_TOKEN = IERC20(lpToken);
@@ -207,13 +198,8 @@ contract FusionXAdapter is IAdapter {
         _TOKEN_A.forceApprove(address(_ROUTER), amountIn);
 
         // Execute swap
-        uint256[] memory amounts = _ROUTER.swapExactTokensForTokens(
-            amountIn,
-            minAmountOut,
-            path,
-            address(this),
-            block.timestamp
-        );
+        uint256[] memory amounts =
+            _ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
 
         amountOut = amounts[1];
 
@@ -245,13 +231,8 @@ contract FusionXAdapter is IAdapter {
         _TOKEN_B.forceApprove(address(_ROUTER), amountIn);
 
         // Execute swap
-        uint256[] memory amounts = _ROUTER.swapExactTokensForTokens(
-            amountIn,
-            minAmountOut,
-            path,
-            address(this),
-            block.timestamp
-        );
+        uint256[] memory amounts =
+            _ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
 
         amountOut = amounts[1];
 
@@ -269,10 +250,7 @@ contract FusionXAdapter is IAdapter {
      * @param amountB Amount of tokenB
      * @return liquidity LP tokens received
      */
-    function _addLiquidity(uint256 amountA, uint256 amountB)
-        internal
-        returns (uint256 liquidity)
-    {
+    function _addLiquidity(uint256 amountA, uint256 amountB) internal returns (uint256 liquidity) {
         // Calculate minimum amounts with slippage
         uint256 amountAMin = (amountA * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
         uint256 amountBMin = (amountB * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
@@ -306,10 +284,7 @@ contract FusionXAdapter is IAdapter {
      * @return amountA Amount of tokenA received
      * @return amountB Amount of tokenB received
      */
-    function _removeLiquidity(uint256 liquidity)
-        internal
-        returns (uint256 amountA, uint256 amountB)
-    {
+    function _removeLiquidity(uint256 liquidity) internal returns (uint256 amountA, uint256 amountB) {
         // Approve router to spend LP tokens
         _LP_TOKEN.forceApprove(address(_ROUTER), liquidity);
 

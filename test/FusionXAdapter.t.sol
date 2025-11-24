@@ -39,12 +39,7 @@ contract FusionXAdapterTest is Test {
         mnt = new MockERC20("Mantle", "MNT", 18);
 
         // Deploy LP token
-        lpToken = new MockUniswapV2Pair(
-            address(usdc),
-            address(mnt),
-            "FusionX USDC-MNT LP",
-            "FUSION-LP"
-        );
+        lpToken = new MockUniswapV2Pair(address(usdc), address(mnt), "FusionX USDC-MNT LP", "FUSION-LP");
 
         // Deploy router
         router = new MockUniswapV2Router();
@@ -55,13 +50,8 @@ contract FusionXAdapterTest is Test {
         vault = new UniversalVault(address(usdc), address(strategyNFT));
 
         // Deploy FusionX adapter
-        fusionXAdapter = new FusionXAdapter(
-            address(usdc),
-            address(mnt),
-            address(lpToken),
-            address(router),
-            address(vault)
-        );
+        fusionXAdapter =
+            new FusionXAdapter(address(usdc), address(mnt), address(lpToken), address(router), address(vault));
 
         // Whitelist adapter
         strategyNFT.setAdapterWhitelist(address(fusionXAdapter), true);
@@ -101,11 +91,7 @@ contract FusionXAdapterTest is Test {
 
         // Verify LP tokens were received
         assertGt(lpReceived, 0, "Should receive LP tokens");
-        assertEq(
-            fusionXAdapter.getBalance(),
-            lpReceived,
-            "Adapter should hold LP tokens"
-        );
+        assertEq(fusionXAdapter.getBalance(), lpReceived, "Adapter should hold LP tokens");
 
         console.log("Adapter LP balance:", fusionXAdapter.getBalance());
     }
@@ -122,12 +108,7 @@ contract FusionXAdapterTest is Test {
         ratios[0] = 10000; // 100%
 
         vm.prank(creator);
-        uint256 strategyId = strategyNFT.mintStrategy(
-            "Pure FusionX",
-            adapters,
-            ratios,
-            10
-        );
+        uint256 strategyId = strategyNFT.mintStrategy("Pure FusionX", adapters, ratios, 10);
 
         console.log("=== FULL INTEGRATION TEST ===");
         console.log("Alice balance before:", usdc.balanceOf(alice));
@@ -145,11 +126,7 @@ contract FusionXAdapterTest is Test {
 
         // Verify balances
         assertEq(shares, expectedNet, "Shares should equal net amount");
-        assertGt(
-            fusionXAdapter.getBalance(),
-            0,
-            "FusionX should have LP tokens"
-        );
+        assertGt(fusionXAdapter.getBalance(), 0, "FusionX should have LP tokens");
 
         console.log("LP tokens in adapter:", fusionXAdapter.getBalance());
     }
@@ -165,12 +142,7 @@ contract FusionXAdapterTest is Test {
         ratios[0] = 10000;
 
         vm.prank(creator);
-        uint256 strategyId = strategyNFT.mintStrategy(
-            "Test",
-            adapters,
-            ratios,
-            10
-        );
+        uint256 strategyId = strategyNFT.mintStrategy("Test", adapters, ratios, 10);
 
         // Alice deposits
         vm.prank(alice);
@@ -214,13 +186,8 @@ contract FusionXAdapterTest is Test {
         path[1] = address(mnt);
 
         vm.prank(address(fusionXAdapter));
-        uint256[] memory amounts = router.swapExactTokensForTokens(
-            swapAmount,
-            0,
-            path,
-            address(fusionXAdapter),
-            block.timestamp
-        );
+        uint256[] memory amounts =
+            router.swapExactTokensForTokens(swapAmount, 0, path, address(fusionXAdapter), block.timestamp);
 
         console.log("Swapped USDC:", swapAmount);
         console.log("Received MNT:", amounts[1]);
@@ -241,21 +208,9 @@ contract FusionXAdapterTest is Test {
      */
     function testAdapterViewFunctions() public {
         assertEq(fusionXAdapter.token(), address(usdc), "Token should be USDC");
-        assertEq(
-            fusionXAdapter.getLPToken(),
-            address(lpToken),
-            "LP token should match"
-        );
-        assertEq(
-            fusionXAdapter.getTokenB(),
-            address(mnt),
-            "TokenB should be MNT"
-        );
-        assertEq(
-            fusionXAdapter.getRouter(),
-            address(router),
-            "Router should match"
-        );
+        assertEq(fusionXAdapter.getLPToken(), address(lpToken), "LP token should match");
+        assertEq(fusionXAdapter.getTokenB(), address(mnt), "TokenB should be MNT");
+        assertEq(fusionXAdapter.getRouter(), address(router), "Router should match");
     }
 
     /**
@@ -337,10 +292,6 @@ contract FusionXAdapterTest is Test {
         console.log("LP balance after Alice:", lpBalanceAfterAlice);
         console.log("LP balance after Bob:", lpBalanceAfterBob);
 
-        assertGt(
-            lpBalanceAfterBob,
-            lpBalanceAfterAlice,
-            "LP balance should increase"
-        );
+        assertGt(lpBalanceAfterBob, lpBalanceAfterAlice, "LP balance should increase");
     }
 }

@@ -69,12 +69,7 @@ contract IntegrationTest is Test {
         console.log("Deployed Lendle Pool:", address(lendingPool));
 
         // Deploy DEX infrastructure
-        lpToken = new MockUniswapV2Pair(
-            address(usdc),
-            address(mnt),
-            "FusionX USDC-MNT LP",
-            "FUSION-LP"
-        );
+        lpToken = new MockUniswapV2Pair(address(usdc), address(mnt), "FusionX USDC-MNT LP", "FUSION-LP");
         dexRouter = new MockUniswapV2Router();
         dexRouter.createPair(address(usdc), address(mnt), address(lpToken));
         console.log("Deployed DEX Router:", address(dexRouter));
@@ -87,18 +82,9 @@ contract IntegrationTest is Test {
         console.log("Deployed Vault:", address(vault));
 
         // Deploy adapters
-        lendleAdapter = new LendleAdapter(
-            address(usdc),
-            address(lendingPool),
-            address(vault)
-        );
-        fusionXAdapter = new FusionXAdapter(
-            address(usdc),
-            address(mnt),
-            address(lpToken),
-            address(dexRouter),
-            address(vault)
-        );
+        lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
+        fusionXAdapter =
+            new FusionXAdapter(address(usdc), address(mnt), address(lpToken), address(dexRouter), address(vault));
         console.log("Deployed LendleAdapter:", address(lendleAdapter));
         console.log("Deployed FusionXAdapter:", address(fusionXAdapter));
 
@@ -193,11 +179,7 @@ contract IntegrationTest is Test {
         console.log("");
 
         // Assertions
-        assertEq(
-            aliceUsdcBalance,
-            INITIAL_BALANCE - DEPOSIT_AMOUNT,
-            "Alice should have spent deposit amount"
-        );
+        assertEq(aliceUsdcBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT, "Alice should have spent deposit amount");
         assertEq(shares, expectedNet, "Shares should equal net amount");
         assertEq(aliceShares, expectedNet, "Alice shares should be tracked");
         assertEq(vaultUsdcBalance, expectedFee, "Vault should hold creator fee");
@@ -295,11 +277,7 @@ contract IntegrationTest is Test {
         console.log("Fee received:", feeReceived);
 
         assertEq(feeReceived, expectedFee, "Creator should receive correct fee");
-        assertEq(
-            vault.accumulatedCreatorFees(strategyId),
-            0,
-            "Accumulated fees should be reset"
-        );
+        assertEq(vault.accumulatedCreatorFees(strategyId), 0, "Accumulated fees should be reset");
 
         console.log("[PASS] Creator fee claimed!\n");
     }
@@ -342,14 +320,10 @@ contract IntegrationTest is Test {
 
         // Verify
         assertGt(bobShares, aliceShares, "Bob should have more shares");
-        assertGt(
-            adapterBalanceAfterBob,
-            adapterBalanceAfterAlice,
-            "Total in adapters should increase"
-        );
+        assertGt(adapterBalanceAfterBob, adapterBalanceAfterAlice, "Total in adapters should increase");
 
         // Verify individual positions
-        (uint256 alicePos, ) = vault.getUserPosition(strategyId, alice);
+        (uint256 alicePos,) = vault.getUserPosition(strategyId, alice);
         (uint256 bobPos, uint256 totalShares) = vault.getUserPosition(strategyId, bob);
 
         console.log("Alice position:", alicePos);
@@ -399,12 +373,7 @@ contract IntegrationTest is Test {
         console.log("Actual FusionX balance:", fusionXBalance);
 
         // Verify split
-        assertApproxEqRel(
-            lendleBalance,
-            expected70,
-            0.01e18,
-            "Lendle should get ~70%"
-        );
+        assertApproxEqRel(lendleBalance, expected70, 0.01e18, "Lendle should get ~70%");
 
         console.log("[PASS] Uneven allocation works!\n");
     }

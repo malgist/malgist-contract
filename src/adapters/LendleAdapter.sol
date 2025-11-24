@@ -10,18 +10,9 @@ import {IAdapter} from "../interfaces/IAdapter.sol";
  * @notice Minimal interface for Aave V3 / Lendle lending pool
  */
 interface ILendingPool {
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external;
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
 
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) external returns (uint256);
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 
     function getReserveToken(address asset) external view returns (address);
 }
