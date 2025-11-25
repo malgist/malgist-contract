@@ -18,7 +18,7 @@ import {MockUniswapV2Router} from "../src/mocks/MockUniswapV2Router.sol";
  * @title DeployScript
  * @notice Deployment script for Mantle Strategy Studio on Mantle Sepolia Testnet
  * @dev Deploys complete ecosystem including mocks for demonstration
- * 
+ *
  * Usage:
  * forge script script/Deploy.s.sol --rpc-url $MANTLE_SEPOLIA_RPC --broadcast --verify -vvvv
  */
@@ -39,13 +39,13 @@ contract DeployScript is Script {
         // 1. Deploy Mock Tokens
         // ========================================
         console.log("1. Deploying Mock Tokens...");
-        
+
         MockERC20 usdc = new MockERC20("USD Coin", "USDC", 6);
         console.log("   USDC deployed at:", address(usdc));
-        
+
         MockERC20 aUsdc = new MockERC20("Aave USDC", "aUSDC", 6);
         console.log("   aUSDC deployed at:", address(aUsdc));
-        
+
         MockERC20 mnt = new MockERC20("Wrapped Mantle", "WMNT", 18);
         console.log("   WMNT deployed at:", address(mnt));
         console.log("");
@@ -54,7 +54,7 @@ contract DeployScript is Script {
         // 2. Deploy Mock Lending Pool (Lendle/Aave style)
         // ========================================
         console.log("2. Deploying Mock Lending Pool...");
-        
+
         MockLendingPool lendingPool = new MockLendingPool();
         lendingPool.setReserveToken(address(usdc), address(aUsdc));
         console.log("   LendingPool deployed at:", address(lendingPool));
@@ -65,15 +65,11 @@ contract DeployScript is Script {
         // 3. Deploy Mock DEX (FusionX/Uniswap V2 style)
         // ========================================
         console.log("3. Deploying Mock DEX...");
-        
-        MockUniswapV2Pair lpToken = new MockUniswapV2Pair(
-            address(usdc),
-            address(mnt),
-            "FusionX USDC-WMNT LP",
-            "FUSION-LP"
-        );
+
+        MockUniswapV2Pair lpToken =
+            new MockUniswapV2Pair(address(usdc), address(mnt), "FusionX USDC-WMNT LP", "FUSION-LP");
         console.log("   LP Token deployed at:", address(lpToken));
-        
+
         MockUniswapV2Router dexRouter = new MockUniswapV2Router();
         dexRouter.createPair(address(usdc), address(mnt), address(lpToken));
         console.log("   DEX Router deployed at:", address(dexRouter));
@@ -89,10 +85,10 @@ contract DeployScript is Script {
         // 4. Deploy Core Contracts
         // ========================================
         console.log("4. Deploying Core Contracts...");
-        
+
         StrategyNFT strategyNFT = new StrategyNFT();
         console.log("   StrategyNFT deployed at:", address(strategyNFT));
-        
+
         UniversalVault vault = new UniversalVault(address(usdc), address(strategyNFT));
         console.log("   UniversalVault deployed at:", address(vault));
         console.log("");
@@ -101,21 +97,12 @@ contract DeployScript is Script {
         // 5. Deploy Adapters
         // ========================================
         console.log("5. Deploying Adapters...");
-        
-        LendleAdapter lendleAdapter = new LendleAdapter(
-            address(usdc),
-            address(lendingPool),
-            address(vault)
-        );
+
+        LendleAdapter lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
         console.log("   LendleAdapter deployed at:", address(lendleAdapter));
-        
-        FusionXAdapter fusionXAdapter = new FusionXAdapter(
-            address(usdc),
-            address(mnt),
-            address(lpToken),
-            address(dexRouter),
-            address(vault)
-        );
+
+        FusionXAdapter fusionXAdapter =
+            new FusionXAdapter(address(usdc), address(mnt), address(lpToken), address(dexRouter), address(vault));
         console.log("   FusionXAdapter deployed at:", address(fusionXAdapter));
         console.log("");
 
@@ -123,10 +110,10 @@ contract DeployScript is Script {
         // 6. Configure System
         // ========================================
         console.log("6. Configuring System...");
-        
+
         strategyNFT.setAdapterWhitelist(address(lendleAdapter), true);
         console.log("   LendleAdapter whitelisted");
-        
+
         strategyNFT.setAdapterWhitelist(address(fusionXAdapter), true);
         console.log("   FusionXAdapter whitelisted");
         console.log("");
