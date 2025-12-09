@@ -13,3 +13,17 @@ docs/
 # Dotenv file
 .env
 wallet
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if using)
+node_modules/
+
+# Logs
+*.log
