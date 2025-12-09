@@ -359,7 +359,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-Built during Mantle Hackathon 2024
+Built during Mantle Hackathon 2025
 
 ---
 
