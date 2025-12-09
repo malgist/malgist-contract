@@ -1,0 +1,80 @@
+# Malgist Deployed Contract Addresses
+# Network: Mantle Sepolia Testnet
+# Chain ID: 5003
+# Deployed: December 9, 2024
+
+## Mock Tokens
+USDC=0x7F5E3eDC4f3c7505C52Cd7938468A630Ad1E32Ee
+AUSDC=0xEf4b194200Ab48c0Fc8d24a726839d1c7F648351
+WMNT=0x68Cd4bD113F5f5A05007a6E2F05C65D3ed80a80F
+
+## Mock Protocols
+LENDING_POOL=0x4dd0f3EAa9F62C0A92e19849ec0B167Aa3a07006
+DEX_ROUTER=0xcd3e666B647CbD029e60d17D351a06F4126607f3
+LP_TOKEN=0x8df84bD7BcaAF7fDE2Fb5bE06f2Af00a37b071CE
+
+## Core Contracts
+USER_VAULT=0x65B43c257c885259360b7165C2773e0d53053b68
+
+## Adapters
+LENDLE_ADAPTER=0xEEE09B03d9260C77404bc51146F7C1d58B439150
+FUSIONX_ADAPTER=0x2F65BE78959DA2D49f250Cc28E01589490cCd029
+
+## JSON Format (for frontend)
+```json
+{
+  "network": "mantle-sepolia",
+  "chainId": 5003,
+  "contracts": {
+    "usdc": "0x7F5E3eDC4f3c7505C52Cd7938468A630Ad1E32Ee",
+    "aUsdc": "0xEf4b194200Ab48c0Fc8d24a726839d1c7F648351",
+    "wmnt": "0x68Cd4bD113F5f5A05007a6E2F05C65D3ed80a80F",
+    "lendingPool": "0x4dd0f3EAa9F62C0A92e19849ec0B167Aa3a07006",
+    "dexRouter": "0xcd3e666B647CbD029e60d17D351a06F4126607f3",
+    "lpToken": "0x8df84bD7BcaAF7fDE2Fb5bE06f2Af00a37b071CE",
+    "userVault": "0x65B43c257c885259360b7165C2773e0d53053b68",
+    "lendleAdapter": "0xEEE09B03d9260C77404bc51146F7C1d58B439150",
+    "fusionXAdapter": "0x2F65BE78959DA2D49f250Cc28E01589490cCd029"
+  }
+}
+```
+
+## Explorer Links
+- UserVault: https://sepolia.mantlescan.xyz/address/0x65B43c257c885259360b7165C2773e0d53053b68
+- USDC Token: https://sepolia.mantlescan.xyz/address/0x7F5E3eDC4f3c7505C52Cd7938468A630Ad1E32Ee
+- LendleAdapter: https://sepolia.mantlescan.xyz/address/0xEEE09B03d9260C77404bc51146F7C1d58B439150
+- FusionXAdapter: https://sepolia.mantlescan.xyz/address/0x2F65BE78959DA2D49f250Cc28E01589490cCd029
+
+## Your Wallet
+Deployer: 0xFbb38C09c81F342733525Aad9a959b033a472001
+Test USDC Balance: 10,000 USDC
+Test WMNT Balance: 100 WMNT
+
+## Next Steps
+
+### 1. Verify Contracts (Important!)
+Follow the guide in DEPLOY_AND_VERIFY.md to verify all contracts on the explorer.
+
+### 2. Test Your Deployment
+Create your first strategy:
+```bash
+export VAULT=0x65B43c257c885259360b7165C2773e0d53053b68
+export LENDLE=0xEEE09B03d9260C77404bc51146F7C1d58B439150
+export FUSION=0x2F65BE78959DA2D49f250Cc28E01589490cCd029
+
+cast send $VAULT \
+  "setStrategy(address[],uint16[],bool,string,uint16)" \
+  "[$LENDLE,$FUSION]" \
+  "[5000,5000]" \
+  true \
+  "My 50/50 Strategy" \
+  10 \
+  --private-key $PRIVATE_KEY \
+  --rpc-url $MANTLE_SEPOLIA_RPC \
+  --legacy
+```
+
+### 3. Verify on Explorer
+Visit: https://sepolia.mantlescan.xyz/address/0x65B43c257c885259360b7165C2773e0d53053b68
+
+🎉 Deployment successful!
