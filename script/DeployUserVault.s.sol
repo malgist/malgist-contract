@@ -61,12 +61,7 @@ contract DeployUserVault is Script {
         // ============ STEP 3: Deploy Mock DEX ============
         console.log("[3/7] Deploying mock DEX...");
         dexRouter = new MockUniswapV2Router();
-        lpToken = new MockUniswapV2Pair(
-            address(usdc),
-            address(wmnt),
-            "FusionX USDC-WMNT LP",
-            "FUSION-LP"
-        );
+        lpToken = new MockUniswapV2Pair(address(usdc), address(wmnt), "FusionX USDC-WMNT LP", "FUSION-LP");
         dexRouter.createPair(address(usdc), address(wmnt), address(lpToken));
         console.log("  DEX Router:", address(dexRouter));
         console.log("  LP Token:", address(lpToken));
@@ -81,20 +76,11 @@ contract DeployUserVault is Script {
         // ============ STEP 5: Deploy Adapters ============
         console.log("[5/7] Deploying adapters...");
 
-        lendleAdapter = new LendleAdapter(
-            address(usdc),
-            address(lendingPool),
-            address(vault)
-        );
+        lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
         console.log("  LendleAdapter:", address(lendleAdapter));
 
-        fusionXAdapter = new FusionXAdapter(
-            address(usdc),
-            address(wmnt),
-            address(lpToken),
-            address(dexRouter),
-            address(vault)
-        );
+        fusionXAdapter =
+            new FusionXAdapter(address(usdc), address(wmnt), address(lpToken), address(dexRouter), address(vault));
         console.log("  FusionXAdapter:", address(fusionXAdapter));
         console.log("");
 

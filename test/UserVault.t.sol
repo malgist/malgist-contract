@@ -39,11 +39,7 @@ contract UserVaultTest is Test {
         vault = new UserVault(address(usdc));
 
         // Deploy adapter
-        lendleAdapter = new LendleAdapter(
-            address(usdc),
-            address(lendingPool),
-            address(vault)
-        );
+        lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
 
         // Mint tokens to users
         usdc.mint(alice, INITIAL_BALANCE);
@@ -248,11 +244,7 @@ contract UserVaultTest is Test {
         vm.prank(bob);
         vault.setStrategy(adapters, ratios, true, "Bob's Strategy", 20);
 
-        (
-            address[] memory users,
-            uint256[] memory copies,
-            string[] memory names
-        ) = vault.getLeaderboardByCopies(10);
+        (address[] memory users, uint256[] memory copies, string[] memory names) = vault.getLeaderboardByCopies(10);
 
         assertEq(users.length, 2);
         assertTrue(users[0] == alice || users[0] == bob);

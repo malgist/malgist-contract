@@ -73,30 +73,16 @@ contract UserVault is ReentrancyGuard {
     // ============ EVENTS ============
 
     event StrategyCreated(
-        address indexed user,
-        address[] adapters,
-        uint16[] ratios,
-        bool isPublic,
-        string name,
-        uint16 copyFeeBps
+        address indexed user, address[] adapters, uint16[] ratios, bool isPublic, string name, uint16 copyFeeBps
     );
 
-    event StrategyCopied(
-        address indexed copier,
-        address indexed creator,
-        uint256 copyFee
-    );
+    event StrategyCopied(address indexed copier, address indexed creator, uint256 copyFee);
 
     event Deposited(address indexed user, uint256 amount, uint256 shares);
 
     event Withdrawn(address indexed user, uint256 shares, uint256 amount);
 
-    event StrategyUpdated(
-        address indexed user,
-        bool isPublic,
-        string name,
-        uint16 copyFeeBps
-    );
+    event StrategyUpdated(address indexed user, bool isPublic, string name, uint16 copyFeeBps);
 
     event CopyFeesClaimed(address indexed user, uint256 amount);
 
@@ -170,14 +156,7 @@ contract UserVault is ReentrancyGuard {
             isInPublicList[msg.sender] = true;
         }
 
-        emit StrategyCreated(
-            msg.sender,
-            adapters,
-            ratios,
-            isPublic,
-            name,
-            copyFeeBps
-        );
+        emit StrategyCreated(msg.sender, adapters, ratios, isPublic, name, copyFeeBps);
     }
 
     /**
@@ -214,9 +193,7 @@ contract UserVault is ReentrancyGuard {
      * @param amount Amount of base asset to deposit
      * @return shares Amount of shares minted
      */
-    function deposit(
-        uint256 amount
-    ) external nonReentrant returns (uint256 shares) {
+    function deposit(uint256 amount) external nonReentrant returns (uint256 shares) {
         if (amount == 0) revert InvalidAmount();
 
         Strategy storage s = strategies[msg.sender];
@@ -231,8 +208,7 @@ contract UserVault is ReentrancyGuard {
         if (originalCreator != address(0)) {
             Strategy memory creatorStrategy = strategies[originalCreator];
             if (creatorStrategy.copyFeeBps > 0) {
-                uint256 copyFee = (amount * creatorStrategy.copyFeeBps) /
-                    TOTAL_BPS;
+                uint256 copyFee = (amount * creatorStrategy.copyFeeBps) / TOTAL_BPS;
                 netAmount = amount - copyFee;
 
                 // Accumulate fee for original creator
@@ -262,9 +238,7 @@ contract UserVault is ReentrancyGuard {
      * @param shareAmount Amount of shares to burn
      * @return withdrawn Amount of assets withdrawn
      */
-    function withdraw(
-        uint256 shareAmount
-    ) external nonReentrant returns (uint256 withdrawn) {
+    function withdraw(uint256 shareAmount) external nonReentrant returns (uint256 withdrawn) {
         if (shareAmount == 0) revert InvalidAmount();
 
         Strategy storage s = strategies[msg.sender];
@@ -275,9 +249,7 @@ contract UserVault is ReentrancyGuard {
 
         // Burn shares
         s.shares -= shareAmount;
-        s.totalDeposited = s.totalDeposited > withdrawn
-            ? s.totalDeposited - withdrawn
-            : 0;
+        s.totalDeposited = s.totalDeposited > withdrawn ? s.totalDeposited - withdrawn : 0;
 
         // Transfer assets to user
         ASSET.safeTransfer(msg.sender, withdrawn);
@@ -305,11 +277,7 @@ contract UserVault is ReentrancyGuard {
      * @param name New strategy name
      * @param copyFeeBps New copy fee
      */
-    function updateStrategyMetadata(
-        bool isPublic,
-        string memory name,
-        uint16 copyFeeBps
-    ) external {
+    function updateStrategyMetadata(bool isPublic, string memory name, uint16 copyFeeBps) external {
         if (copyFeeBps > MAX_COPY_FEE_BPS) revert CopyFeeExceedsMax();
 
         Strategy storage s = strategies[msg.sender];
@@ -362,20 +330,12 @@ contract UserVault is ReentrancyGuard {
      * @return copies Array of copy counts
      * @return names Array of strategy names
      */
-    function getLeaderboardByCopies(
-        uint256 count
-    )
+    function getLeaderboardByCopies(uint256 count)
         external
         view
-        returns (
-            address[] memory users,
-            uint256[] memory copies,
-            string[] memory names
-        )
+        returns (address[] memory users, uint256[] memory copies, string[] memory names)
     {
-        uint256 length = publicStrategies.length < count
-            ? publicStrategies.length
-            : count;
+        uint256 length = publicStrategies.length < count ? publicStrategies.length : count;
         users = new address[](length);
         copies = new uint256[](length);
         names = new string[](length);
@@ -407,11 +367,7 @@ contract UserVault is ReentrancyGuard {
      * @param ratios Allocation ratios
      * @param amount Total amount to split
      */
-    function _executeDeposit(
-        address[] memory adapters,
-        uint16[] memory ratios,
-        uint256 amount
-    ) internal {
+    function _executeDeposit(address[] memory adapters, uint16[] memory ratios, uint256 amount) internal {
         uint256 remaining = amount;
 
         for (uint256 i = 0; i < adapters.length; i++) {
@@ -439,17 +395,14 @@ contract UserVault is ReentrancyGuard {
      * @param shareAmount Amount of shares to withdraw
      * @return totalWithdrawn Total amount withdrawn
      */
-    function _executeWithdraw(
-        address[] memory adapters,
-        uint16[] memory ratios,
-        uint256 shareAmount
-    ) internal returns (uint256 totalWithdrawn) {
+    function _executeWithdraw(address[] memory adapters, uint16[] memory ratios, uint256 shareAmount)
+        internal
+        returns (uint256 totalWithdrawn)
+    {
         for (uint256 i = 0; i < adapters.length; i++) {
             uint256 adapterShares = (shareAmount * ratios[i]) / TOTAL_BPS;
             if (adapterShares > 0) {
-                uint256 withdrawn = IAdapter(adapters[i]).withdraw(
-                    adapterShares
-                );
+                uint256 withdrawn = IAdapter(adapters[i]).withdraw(adapterShares);
                 totalWithdrawn += withdrawn;
             }
         }
