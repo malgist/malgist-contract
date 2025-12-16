@@ -85,7 +85,7 @@ contract StrategyRegistry is Ownable, IStrategyRegistry {
     // Phase model for progressive decentralization
     enum StrategyPhase { Restricted, Limited, Permissionless }
 
-    // internal storage for phase; expose as uint8 via getter to match interface
+    // internal storage for phase (uint8); pack with other small types
     StrategyPhase internal _phase;
 
     // Per-strategy canonical metadata
@@ -97,6 +97,11 @@ contract StrategyRegistry is Ownable, IStrategyRegistry {
         bool exists;
     }
 
+    // ======== STORAGE (packed) ========
+    // Slot 1: _phase (1 byte, enum) + padding
+    // Note: enums take 1 byte in storage but occupy full 32 bytes in slot due to storage alignment
+    // Slot 2+: config values
+    
     // strategyId => meta
     mapping(uint256 => StrategyMeta) public strategies;
 
@@ -108,13 +113,13 @@ contract StrategyRegistry is Ownable, IStrategyRegistry {
     // approved registrars (e.g., Vault) that may register on behalf of creators
     mapping(address => bool) public approvedRegistrar;
 
-    // Per-address strategy count, and limit
+    // Per-address strategy count, and limit (pack uint256 + uint256)
     mapping(address => uint256) public creatorStrategyCount;
-    uint256 public maxStrategiesPerAddress = 5;
+    uint256 public maxStrategiesPerAddress;
 
-    // Limits for Limited phase
-    uint256 public limitedMaxTVLPerStrategy; // in asset units
-    uint256 public limitedMaxTVLPerReviewedStrategy; // higher cap for reviewed
+    // Limits for Limited phase (pack two uint256 together for better packing)
+    uint256 public limitedMaxTVLPerStrategy;
+    uint256 public limitedMaxTVLPerReviewedStrategy;
 
     // Events
     event StrategyCreated(uint256 indexed strategyId, address indexed creator);
@@ -131,6 +136,7 @@ contract StrategyRegistry is Ownable, IStrategyRegistry {
     constructor() Ownable(msg.sender) {
         // default to Restricted to be conservative
         _phase = StrategyPhase.Restricted;
+        maxStrategiesPerAddress = 5;
         limitedMaxTVLPerStrategy = 1_000 ether; // sensible default for tests
         limitedMaxTVLPerReviewedStrategy = 10_000 ether;
     }

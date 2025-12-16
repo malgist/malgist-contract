@@ -92,6 +92,9 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     /// @notice Adapter address => cached reported balance (in base units)
     mapping(address => uint256) public adapterCached;
 
+    /// @notice Minimum seconds between rebalances per strategy
+    uint256 public minRebalanceInterval = 3600; // default 1 hour
+
     /// @notice Performance tracking contract address (separate module)
     address public performanceTracker;
 
@@ -100,9 +103,6 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
 
     /// @notice Strategy registry contract
     IStrategyRegistry public strategyRegistry;
-
-    /// @notice Minimum seconds between rebalances per strategy
-    uint256 public minRebalanceInterval = 3600; // default 1 hour
 
     /// @notice Last rebalance timestamp per strategy id
     mapping(uint256 => uint256) public lastRebalance;

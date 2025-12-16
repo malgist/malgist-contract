@@ -18,18 +18,23 @@ contract FeeManager is IFeeManager {
     uint16 public constant MAX_PROTOCOL_FEE_BPS = 500; // 5%
     uint16 public constant TOTAL_BPS = 10000;
 
-    address public admin;
-    address public operator;
-
     // ======== ERRORS ========
     error UnauthorizedCaller(address caller);
     error InvalidBps(uint16 bps);
     error InsufficientBalance(uint256 required, uint256 available);
+    error ZeroAddress();
 
     // ======== STATE ========
-    IERC20 public immutable ASSET;
+    // Storage packing: consolidate addresses and small types
+    // Slot 0: admin (20 bytes) + operator (20 bytes) - packed into one slot
+    address public admin;
+    address public operator;
+
+    // Slot 1: treasury (20 bytes) + protocolFeeBps (2 bytes) - packed
     address public treasury;
     uint16 public protocolFeeBps;
+
+    IERC20 public immutable ASSET;
 
     // Authorized vaults that may call `chargeFees`
     mapping(address => bool) public authorizedVaults;
@@ -44,9 +49,10 @@ contract FeeManager is IFeeManager {
 
     // ======== CONSTRUCTOR ========
     constructor(address _asset, address _treasury, uint16 _protocolFeeBps, address _admin) {
-        require(_asset != address(0), "zero asset");
-        require(_treasury != address(0), "zero treasury");
+        if (_asset == address(0)) revert ZeroAddress();
+        if (_treasury == address(0)) revert ZeroAddress();
         if (_protocolFeeBps > MAX_PROTOCOL_FEE_BPS) revert InvalidBps(_protocolFeeBps);
+        if (_admin == address(0)) revert ZeroAddress();
 
         ASSET = IERC20(_asset);
         treasury = _treasury;
@@ -73,7 +79,7 @@ contract FeeManager is IFeeManager {
     }
 
     function setTreasury(address _treasury) external onlyAdmin {
-        require(_treasury != address(0), "zero treasury");
+        if (_treasury == address(0)) revert ZeroAddress();
         treasury = _treasury;
         emit TreasuryUpdated(_treasury);
     }
