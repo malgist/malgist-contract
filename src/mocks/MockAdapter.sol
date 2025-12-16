@@ -108,4 +108,13 @@ contract MockAdapter is IAdapter {
 
         emit YieldMinted(to, amount);
     }
+
+    /**
+     * @notice Simulate loss by reducing total assets (for testing)
+     * @param amount Amount to remove from totalAssets
+     */
+    function slash(uint256 amount) external {
+        require(amount <= totalAssets, "Insufficient assets");
+        totalAssets -= amount;
+    }
 }

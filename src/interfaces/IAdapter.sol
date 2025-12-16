@@ -9,15 +9,19 @@ pragma solidity ^0.8.20;
 interface IAdapter {
     /**
      * @notice Deposit tokens into the underlying protocol
+     * @dev Implementations MUST return the asset-equivalent amount accepted by the adapter
+     *      (i.e., value expressed in base tokens) so the vault can maintain a unified accounting
      * @param amount Amount of base token to deposit
-     * @return shares Amount of shares/receipt tokens received
+     * @return deposited Amount (in base asset units) that the adapter recorded / added
      */
-    function deposit(uint256 amount) external returns (uint256 shares);
+    function deposit(uint256 amount) external returns (uint256 deposited);
 
     /**
      * @notice Withdraw tokens from the underlying protocol
+     * @dev `amount` is expressed in base-asset units; adapter should try to return that amount
+     *      and return the actual withdrawn amount (may differ due to slippage/fees)
      * @param amount Amount of base token to withdraw
-     * @return withdrawn Actual amount withdrawn (may differ due to fees/slippage)
+     * @return withdrawn Actual amount withdrawn (in base asset units)
      */
     function withdraw(uint256 amount) external returns (uint256 withdrawn);
 
