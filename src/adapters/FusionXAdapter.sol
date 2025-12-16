@@ -55,19 +55,19 @@ contract FusionXAdapter is IAdapter {
     using SafeERC20 for IERC20;
 
     /// @notice The base token for deposits/withdrawals (e.g., USDC)
-    IERC20 private immutable _TOKEN_A;
+    IERC20 public immutable TOKEN_A;
 
     /// @notice The paired token (e.g., MNT)
-    IERC20 private immutable _TOKEN_B;
+    IERC20 public immutable TOKEN_B;
 
     /// @notice The LP token representing liquidity position
-    IERC20 private immutable _LP_TOKEN;
+    IERC20 public immutable LP_TOKEN;
 
     /// @notice The Uniswap V2 style router
-    IUniswapV2Router private immutable _ROUTER;
+    IUniswapV2Router public immutable ROUTER;
 
     /// @notice The vault address that owns this adapter
-    address private immutable _VAULT;
+    address public immutable VAULT;
 
     /// @notice Slippage tolerance in basis points (e.g., 50 = 0.5%)
     uint16 public constant SLIPPAGE_BPS = 50;
@@ -90,7 +90,7 @@ contract FusionXAdapter is IAdapter {
     error SlippageExceeded();
 
     modifier onlyVault() {
-        if (msg.sender != _VAULT) revert OnlyVault();
+        if (msg.sender != VAULT) revert OnlyVault();
         _;
     }
 
@@ -103,11 +103,11 @@ contract FusionXAdapter is IAdapter {
      * @param vault The UniversalVault address
      */
     constructor(address tokenA, address tokenB, address lpToken, address router, address vault) {
-        _TOKEN_A = IERC20(tokenA);
-        _TOKEN_B = IERC20(tokenB);
-        _LP_TOKEN = IERC20(lpToken);
-        _ROUTER = IUniswapV2Router(router);
-        _VAULT = vault;
+        TOKEN_A = IERC20(tokenA);
+        TOKEN_B = IERC20(tokenB);
+        LP_TOKEN = IERC20(lpToken);
+        ROUTER = IUniswapV2Router(router);
+        VAULT = vault;
     }
 
     /**
@@ -120,7 +120,7 @@ contract FusionXAdapter is IAdapter {
         if (amount == 0) revert InvalidAmount();
 
         // Transfer tokenA from vault
-        _TOKEN_A.safeTransferFrom(msg.sender, address(this), amount);
+        TOKEN_A.safeTransferFrom(msg.sender, address(this), amount);
 
         // Step 1: Swap 50% of tokenA for tokenB
         uint256 amountToSwap = amount / 2;
@@ -144,7 +144,7 @@ contract FusionXAdapter is IAdapter {
     function withdraw(uint256 amount) external onlyVault returns (uint256 withdrawn) {
         if (amount == 0) revert InvalidAmount();
 
-        uint256 lpBalance = _LP_TOKEN.balanceOf(address(this));
+        uint256 lpBalance = LP_TOKEN.balanceOf(address(this));
         if (amount > lpBalance) revert InvalidAmount();
 
         // Step 1: Remove liquidity to get back tokenA and tokenB
@@ -159,7 +159,7 @@ contract FusionXAdapter is IAdapter {
         withdrawn = amountA + amountAFromSwap;
 
         // Transfer all tokenA to vault
-        _TOKEN_A.safeTransfer(_VAULT, withdrawn);
+        TOKEN_A.safeTransfer(VAULT, withdrawn);
 
         return withdrawn;
     }
@@ -169,7 +169,7 @@ contract FusionXAdapter is IAdapter {
      * @return balance LP token balance
      */
     function getBalance() external view returns (uint256 balance) {
-        return _LP_TOKEN.balanceOf(address(this));
+        return LP_TOKEN.balanceOf(address(this));
     }
 
     /**
@@ -177,7 +177,7 @@ contract FusionXAdapter is IAdapter {
      * @return tokenAddress The base token (tokenA)
      */
     function token() external view returns (address tokenAddress) {
-        return address(_TOKEN_A);
+        return address(TOKEN_A);
     }
 
     /**
@@ -187,26 +187,26 @@ contract FusionXAdapter is IAdapter {
      */
     function _swapAForB(uint256 amountIn) internal returns (uint256 amountOut) {
         address[] memory path = new address[](2);
-        path[0] = address(_TOKEN_A);
-        path[1] = address(_TOKEN_B);
+        path[0] = address(TOKEN_A);
+        path[1] = address(TOKEN_B);
 
         // Calculate minimum output with slippage
-        uint256[] memory amountsOut = _ROUTER.getAmountsOut(amountIn, path);
+        uint256[] memory amountsOut = ROUTER.getAmountsOut(amountIn, path);
         uint256 minAmountOut = (amountsOut[1] * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
 
         // Approve router
-        _TOKEN_A.forceApprove(address(_ROUTER), amountIn);
+        TOKEN_A.forceApprove(address(ROUTER), amountIn);
 
         // Execute swap
         uint256[] memory amounts =
-            _ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
+            ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
 
         amountOut = amounts[1];
 
         // Reset approval
-        _TOKEN_A.forceApprove(address(_ROUTER), 0);
+        TOKEN_A.forceApprove(address(ROUTER), 0);
 
-        emit TokensSwapped(address(_TOKEN_A), address(_TOKEN_B), amountIn, amountOut);
+        emit TokensSwapped(address(TOKEN_A), address(TOKEN_B), amountIn, amountOut);
 
         return amountOut;
     }
@@ -220,26 +220,26 @@ contract FusionXAdapter is IAdapter {
         if (amountIn == 0) return 0;
 
         address[] memory path = new address[](2);
-        path[0] = address(_TOKEN_B);
-        path[1] = address(_TOKEN_A);
+        path[0] = address(TOKEN_B);
+        path[1] = address(TOKEN_A);
 
         // Calculate minimum output with slippage
-        uint256[] memory amountsOut = _ROUTER.getAmountsOut(amountIn, path);
+        uint256[] memory amountsOut = ROUTER.getAmountsOut(amountIn, path);
         uint256 minAmountOut = (amountsOut[1] * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
 
         // Approve router
-        _TOKEN_B.forceApprove(address(_ROUTER), amountIn);
+        TOKEN_B.forceApprove(address(ROUTER), amountIn);
 
         // Execute swap
         uint256[] memory amounts =
-            _ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
+            ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
 
         amountOut = amounts[1];
 
         // Reset approval
-        _TOKEN_B.forceApprove(address(_ROUTER), 0);
+        TOKEN_B.forceApprove(address(ROUTER), 0);
 
-        emit TokensSwapped(address(_TOKEN_B), address(_TOKEN_A), amountIn, amountOut);
+        emit TokensSwapped(address(TOKEN_B), address(TOKEN_A), amountIn, amountOut);
 
         return amountOut;
     }
@@ -256,13 +256,13 @@ contract FusionXAdapter is IAdapter {
         uint256 amountBMin = (amountB * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
 
         // Approve router for both tokens
-        _TOKEN_A.forceApprove(address(_ROUTER), amountA);
-        _TOKEN_B.forceApprove(address(_ROUTER), amountB);
+        TOKEN_A.forceApprove(address(ROUTER), amountA);
+        TOKEN_B.forceApprove(address(ROUTER), amountB);
 
         // Add liquidity
-        (,, liquidity) = _ROUTER.addLiquidity(
-            address(_TOKEN_A),
-            address(_TOKEN_B),
+        (,, liquidity) = ROUTER.addLiquidity(
+            address(TOKEN_A),
+            address(TOKEN_B),
             amountA,
             amountB,
             amountAMin,
@@ -272,8 +272,8 @@ contract FusionXAdapter is IAdapter {
         );
 
         // Reset approvals
-        _TOKEN_A.forceApprove(address(_ROUTER), 0);
-        _TOKEN_B.forceApprove(address(_ROUTER), 0);
+        TOKEN_A.forceApprove(address(ROUTER), 0);
+        TOKEN_B.forceApprove(address(ROUTER), 0);
 
         return liquidity;
     }
@@ -286,12 +286,12 @@ contract FusionXAdapter is IAdapter {
      */
     function _removeLiquidity(uint256 liquidity) internal returns (uint256 amountA, uint256 amountB) {
         // Approve router to spend LP tokens
-        _LP_TOKEN.forceApprove(address(_ROUTER), liquidity);
+        LP_TOKEN.forceApprove(address(ROUTER), liquidity);
 
         // Remove liquidity (set min amounts to 0 for simplicity in testing)
-        (amountA, amountB) = _ROUTER.removeLiquidity(
-            address(_TOKEN_A),
-            address(_TOKEN_B),
+        (amountA, amountB) = ROUTER.removeLiquidity(
+            address(TOKEN_A),
+            address(TOKEN_B),
             liquidity,
             0, // amountAMin - could calculate with slippage
             0, // amountBMin - could calculate with slippage
@@ -300,7 +300,7 @@ contract FusionXAdapter is IAdapter {
         );
 
         // Reset approval
-        _LP_TOKEN.forceApprove(address(_ROUTER), 0);
+        LP_TOKEN.forceApprove(address(ROUTER), 0);
 
         return (amountA, amountB);
     }
@@ -309,20 +309,20 @@ contract FusionXAdapter is IAdapter {
      * @notice Get the LP token address
      */
     function getLPToken() external view returns (address) {
-        return address(_LP_TOKEN);
+        return address(LP_TOKEN);
     }
 
     /**
      * @notice Get the paired token address
      */
     function getTokenB() external view returns (address) {
-        return address(_TOKEN_B);
+        return address(TOKEN_B);
     }
 
     /**
      * @notice Get the router address
      */
     function getRouter() external view returns (address) {
-        return address(_ROUTER);
+        return address(ROUTER);
     }
 }

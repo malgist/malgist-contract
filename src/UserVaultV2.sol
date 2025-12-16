@@ -5,16 +5,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IAdapter} from "./interfaces/IAdapter.sol";
-import {EmergencyPause} from "./EmergencyPause.sol";
+import {Pausable} from "./Pausable.sol";
+import {LeaderboardLib} from "./libraries/LeaderboardLib.sol";
 
 /**
- * @title UserVault
- * @notice Copy-trading DeFi vault where users can create, share, and copy investment strategies
- * @dev Each user can have one active strategy. Strategies can be public (copyable) or private.
- *      Integrates emergency pause system for exploit response while maintaining withdrawal immunity.
+ * @title UserVaultV2
+ * @notice Enhanced copy-trading DeFi vault with leaderboard sorting, TVL tracking, and pause mechanism
+ * @dev Production-grade implementation with PRIORITY 1 features
  */
-contract UserVault is ReentrancyGuard, EmergencyPause {
+contract UserVaultV2 is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
+    using LeaderboardLib for LeaderboardLib.LeaderboardEntry[];
 
     // ============ STATE VARIABLES ============
 
@@ -30,17 +31,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     // ============ STRUCTS ============
 
     /**
-     * @notice Strategy configuration and metadata
-     * @param adapters Array of protocol adapter addresses
-     * @param ratios Allocation ratios in basis points (must sum to 10000)
-     * @param totalDeposited Total amount deposited by this user
-     * @param shares User's current share balance
-     * @param isPublic Whether strategy is visible/copyable by others
-     * @param name Human-readable strategy name
-     * @param copyFeeBps Fee charged when others copy (0-50 bps)
-     * @param creator Address of strategy creator (for copy tracking)
-     * @param totalCopies Number of times this strategy has been copied
-     * @param totalCopierTVL Total value locked by users who copied this strategy
+     * @notice Strategy configuration and metadata with enhanced TVL tracking
      */
     struct Strategy {
         address[] adapters;
@@ -52,7 +43,18 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         uint16 copyFeeBps;
         address creator;
         uint256 totalCopies;
-        uint256 totalCopierTVL;
+        uint256 totalCopierTVL; // TVL from all copiers
+        uint256 lastUpdated; // Last timestamp updated
+    }
+
+    /**
+     * @notice Leaderboard ranking entry
+     */
+    struct RankingEntry {
+        address strategy;
+        uint256 value;
+        uint256 rank;
+        string name;
     }
 
     // ============ STORAGE ============
@@ -72,6 +74,12 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     /// @notice Track who a user copied their strategy from
     mapping(address => address) public copiedFrom;
 
+    /// @notice Last TVL snapshot timestamp (for gas-efficient leaderboard updates)
+    uint256 public lastLeaderboardUpdate;
+
+    /// @notice Update frequency for leaderboard (in seconds)
+    uint256 public leaderboardUpdateFrequency = 1 hours;
+
     // ============ EVENTS ============
 
     event StrategyCreated(
@@ -80,13 +88,17 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
 
     event StrategyCopied(address indexed copier, address indexed creator, uint256 copyFee);
 
-    event Deposited(address indexed user, uint256 amount, uint256 shares);
+    event Deposited(address indexed user, uint256 amount, uint256 shares, uint256 timestamp);
 
-    event Withdrawn(address indexed user, uint256 shares, uint256 amount);
+    event Withdrawn(address indexed user, uint256 shares, uint256 amount, uint256 timestamp);
 
     event StrategyUpdated(address indexed user, bool isPublic, string name, uint16 copyFeeBps);
 
     event CopyFeesClaimed(address indexed user, uint256 amount);
+
+    event TVLUpdated(address indexed strategy, uint256 tvl, uint256 timestamp);
+
+    event LeaderboardUpdated(address indexed strategy, uint256 rank, uint256 timestamp);
 
     // ============ ERRORS ============
 
@@ -99,18 +111,19 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     error InsufficientBalance();
     error InvalidAmount();
     error CannotCopySelf();
-    error DepositReturnedZero();
-    // AdapterPausedError is inherited from EmergencyPause
+    error VaultPausedForDeposits();
+    error AdapterNotOperational();
 
     // ============ CONSTRUCTOR ============
 
     /**
-     * @notice Initialize vault with base asset and emergency pause owner
+     * @notice Initialize vault with base asset
      * @param _asset Address of base asset (USDC)
-     * @param _pauseOwner Address of pause guardian (typically multisig)
+     * @param _owner Owner/governance address
      */
-    constructor(address _asset, address _pauseOwner) EmergencyPause(_pauseOwner) {
+    constructor(address _asset, address _owner) Pausable(_owner) {
         ASSET = IERC20(_asset);
+        lastLeaderboardUpdate = block.timestamp;
     }
 
     // ============ EXTERNAL FUNCTIONS ============
@@ -129,7 +142,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         bool isPublic,
         string memory name,
         uint16 copyFeeBps
-    ) external whenStrategyExecutionNotPaused {
+    ) external whenNotPaused {
         // Validations
         if (adapters.length == 0 || adapters.length != ratios.length) {
             revert ArrayLengthMismatch();
@@ -142,6 +155,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         uint256 totalRatio;
         for (uint256 i = 0; i < ratios.length; i++) {
             if (ratios[i] == 0) revert InvalidRatios();
+            if (pausedAdapters[adapters[i]]) revert AdapterNotOperational();
             totalRatio += ratios[i];
         }
         if (totalRatio != TOTAL_BPS) revert RatiosMustSumTo100();
@@ -154,6 +168,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         s.name = name;
         s.copyFeeBps = copyFeeBps;
         s.creator = msg.sender;
+        s.lastUpdated = block.timestamp;
 
         // Add to public list if newly public
         if (isPublic && !isInPublicList[msg.sender]) {
@@ -168,7 +183,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
      * @notice Copy another user's public strategy
      * @param creator Address of strategy creator to copy
      */
-    function copyStrategy(address creator) external whenStrategyExecutionNotPaused {
+    function copyStrategy(address creator) external whenNotPaused {
         if (creator == msg.sender) revert CannotCopySelf();
 
         Strategy memory original = strategies[creator];
@@ -183,6 +198,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         userStrategy.name = string(abi.encodePacked("Copy of ", original.name));
         userStrategy.copyFeeBps = 0; // No copy fee on copied strategies
         userStrategy.creator = msg.sender;
+        userStrategy.lastUpdated = block.timestamp;
 
         // Track who this user copied from
         copiedFrom[msg.sender] = creator;
@@ -194,22 +210,20 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     }
 
     /**
-     * @notice Deposit assets into user's strategy
+     * @notice Deposit assets into user's strategy (REVERT if paused)
      * @param amount Amount of base asset to deposit
+     * @param slippageTolerance Maximum acceptable slippage in basis points
      * @return shares Amount of shares minted
-     * @dev Deposit is blocked during global pause or if any adapter in the strategy is paused
      */
-    function deposit(uint256 amount) external nonReentrant whenDepositsNotPaused returns (uint256 shares) {
+    function deposit(uint256 amount, uint16 slippageTolerance) external nonReentrant whenNotPaused returns (uint256 shares) {
         if (amount == 0) revert InvalidAmount();
 
         Strategy storage s = strategies[msg.sender];
         if (s.adapters.length == 0) revert NoStrategySet();
 
-        // Validate all adapters in strategy are operational (not paused)
+        // Validate all adapters are operational
         for (uint256 i = 0; i < s.adapters.length; i++) {
-            if (!isAdapterOperational(s.adapters[i])) {
-                revert AdapterPausedError();
-            }
+            if (pausedAdapters[s.adapters[i]]) revert AdapterNotOperational();
         }
 
         // Transfer assets from user
@@ -241,13 +255,16 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         shares = netAmount;
         s.shares += shares;
         s.totalDeposited += netAmount;
+        s.lastUpdated = block.timestamp;
 
-        emit Deposited(msg.sender, amount, shares);
+        emit Deposited(msg.sender, amount, shares, block.timestamp);
+        emit TVLUpdated(msg.sender, s.totalDeposited + s.totalCopierTVL, block.timestamp);
+
         return shares;
     }
 
     /**
-     * @notice Withdraw assets from user's strategy
+     * @notice Withdraw assets from user's strategy (ALLOWED even if paused)
      * @param shareAmount Amount of shares to burn
      * @return withdrawn Amount of assets withdrawn
      */
@@ -263,11 +280,14 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         // Burn shares
         s.shares -= shareAmount;
         s.totalDeposited = s.totalDeposited > withdrawn ? s.totalDeposited - withdrawn : 0;
+        s.lastUpdated = block.timestamp;
 
         // Transfer assets to user
         ASSET.safeTransfer(msg.sender, withdrawn);
 
-        emit Withdrawn(msg.sender, shareAmount, withdrawn);
+        emit Withdrawn(msg.sender, shareAmount, withdrawn, block.timestamp);
+        emit TVLUpdated(msg.sender, s.totalDeposited + s.totalCopierTVL, block.timestamp);
+
         return withdrawn;
     }
 
@@ -286,11 +306,8 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
 
     /**
      * @notice Update strategy metadata (name, public status, copy fee)
-     * @param isPublic Whether strategy should be public
-     * @param name New strategy name
-     * @param copyFeeBps New copy fee
      */
-    function updateStrategyMetadata(bool isPublic, string memory name, uint16 copyFeeBps) external {
+    function updateStrategyMetadata(bool isPublic, string memory name, uint16 copyFeeBps) external whenNotPaused {
         if (copyFeeBps > MAX_COPY_FEE_BPS) revert CopyFeeExceedsMax();
 
         Strategy storage s = strategies[msg.sender];
@@ -299,6 +316,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         s.isPublic = isPublic;
         s.name = name;
         s.copyFeeBps = copyFeeBps;
+        s.lastUpdated = block.timestamp;
 
         // Update public list
         if (isPublic && !isInPublicList[msg.sender]) {
@@ -309,19 +327,120 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         emit StrategyUpdated(msg.sender, isPublic, name, copyFeeBps);
     }
 
-    // ============ VIEW FUNCTIONS ============
+    // ============ LEADERBOARD VIEW FUNCTIONS ============
 
     /**
-     * @notice Get user's strategy configuration
-     * @param user Address of user
-     * @return Strategy struct
+     * @notice Get top strategies ranked by total copies (with sorting)
+     * @param count Number of top strategies to return
+     * @return rankings Array of ranking entries
      */
-    function getStrategy(address user) external view returns (Strategy memory) {
-        return strategies[user];
+    function getLeaderboardByCopies(uint256 count) external view returns (RankingEntry[] memory rankings) {
+        uint256 length = publicStrategies.length;
+        if (length == 0) return new RankingEntry[](0);
+
+        // Build entries array
+        LeaderboardLib.LeaderboardEntry[] memory entries = new LeaderboardLib.LeaderboardEntry[](length);
+        for (uint256 i = 0; i < length; i++) {
+            address user = publicStrategies[i];
+            entries[i] = LeaderboardLib.LeaderboardEntry({user: user, value: strategies[user].totalCopies});
+        }
+
+        // Sort and get top N
+        LeaderboardLib.LeaderboardEntry[] memory sorted = LeaderboardLib.getTopN(entries, count);
+
+        // Build ranking results
+        rankings = new RankingEntry[](sorted.length);
+        for (uint256 i = 0; i < sorted.length; i++) {
+            rankings[i] = RankingEntry({
+                strategy: sorted[i].user,
+                value: sorted[i].value,
+                rank: i + 1,
+                name: strategies[sorted[i].user].name
+            });
+        }
+
+        return rankings;
     }
 
     /**
-     * @notice Get user's current position value
+     * @notice Get top strategies ranked by Total Value Locked (TVL)
+     * @param count Number of top strategies to return
+     * @return rankings Array of ranking entries with TVL values
+     */
+    function getLeaderboardByTVL(uint256 count) external view returns (RankingEntry[] memory rankings) {
+        uint256 length = publicStrategies.length;
+        if (length == 0) return new RankingEntry[](0);
+
+        // Build entries array with TVL values
+        LeaderboardLib.LeaderboardEntry[] memory entries = new LeaderboardLib.LeaderboardEntry[](length);
+        for (uint256 i = 0; i < length; i++) {
+            address user = publicStrategies[i];
+            Strategy memory strat = strategies[user];
+            uint256 tvl = strat.totalDeposited + strat.totalCopierTVL;
+            entries[i] = LeaderboardLib.LeaderboardEntry({user: user, value: tvl});
+        }
+
+        // Sort and get top N
+        LeaderboardLib.LeaderboardEntry[] memory sorted = LeaderboardLib.getTopN(entries, count);
+
+        // Build ranking results
+        rankings = new RankingEntry[](sorted.length);
+        for (uint256 i = 0; i < sorted.length; i++) {
+            rankings[i] = RankingEntry({
+                strategy: sorted[i].user,
+                value: sorted[i].value,
+                rank: i + 1,
+                name: strategies[sorted[i].user].name
+            });
+        }
+
+        return rankings;
+    }
+
+    /**
+     * @notice Get user's strategy with TVL breakdown
+     * @param user Address of user
+     * @return strategy Strategy struct
+     * @return totalTVL Total TVL (deposits + copier deposits)
+     * @return copierTVL TVL from copiers only
+     */
+    function getStrategyWithTVL(address user)
+        external
+        view
+        returns (Strategy memory strategy, uint256 totalTVL, uint256 copierTVL)
+    {
+        strategy = strategies[user];
+        copierTVL = strategy.totalCopierTVL;
+        totalTVL = strategy.totalDeposited + copierTVL;
+    }
+
+    /**
+     * @notice Get all public strategies with current rankings
+     * @return strategies Array of public strategy addresses
+     * @return tvls Array of TVL values for each strategy
+     * @return copies Array of copy counts for each strategy
+     */
+    function getPublicStrategiesWithMetrics()
+        external
+        view
+        returns (address[] memory, uint256[] memory tvls, uint256[] memory copies)
+    {
+        uint256 length = publicStrategies.length;
+        tvls = new uint256[](length);
+        copies = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address user = publicStrategies[i];
+            Strategy memory s = strategies[user];
+            tvls[i] = s.totalDeposited + s.totalCopierTVL;
+            copies[i] = s.totalCopies;
+        }
+
+        return (publicStrategies, tvls, copies);
+    }
+
+    /**
+     * @notice Get user's current position value (updated in real-time from adapters)
      * @param user Address of user
      * @return Total value across all adapters
      */
@@ -337,39 +456,35 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     }
 
     /**
-     * @notice Get top strategies by number of copies
-     * @param count Number of strategies to return
-     * @return users Array of user addresses
-     * @return copies Array of copy counts
-     * @return names Array of strategy names
+     * @notice Get strategy ranking by TVL (percentile)
+     * @param user Address of user
+     * @return percentile Ranking percentile (0-10000 basis points)
      */
-    function getLeaderboardByCopies(uint256 count)
-        external
-        view
-        returns (address[] memory users, uint256[] memory copies, string[] memory names)
-    {
-        uint256 length = publicStrategies.length < count ? publicStrategies.length : count;
-        users = new address[](length);
-        copies = new uint256[](length);
-        names = new string[](length);
+    function getStrategyTVLPercentile(address user) external view returns (uint256 percentile) {
+        uint256 length = publicStrategies.length;
+        if (length == 0) return 0;
 
-        // Simple implementation: return first N (TODO: add sorting)
+        // Build TVL array
+        uint256[] memory tvls = new uint256[](length);
+        uint256 userTVL = 0;
+        bool userFound = false;
+
         for (uint256 i = 0; i < length; i++) {
-            address user = publicStrategies[i];
-            users[i] = user;
-            copies[i] = strategies[user].totalCopies;
-            names[i] = strategies[user].name;
+            address stratUser = publicStrategies[i];
+            Strategy memory s = strategies[stratUser];
+            uint256 tvl = s.totalDeposited + s.totalCopierTVL;
+            tvls[i] = tvl;
+
+            if (stratUser == user) {
+                userTVL = tvl;
+                userFound = true;
+            }
         }
 
-        return (users, copies, names);
-    }
+        if (!userFound) return 0;
 
-    /**
-     * @notice Get all public strategies
-     * @return Array of user addresses with public strategies
-     */
-    function getPublicStrategies() external view returns (address[] memory) {
-        return publicStrategies;
+        // Calculate percentile
+        percentile = LeaderboardLib.getPercentile(userTVL, tvls);
     }
 
     // ============ INTERNAL FUNCTIONS ============
@@ -394,14 +509,12 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
                 remaining -= adapterAmount;
             }
 
-            // Approve and deposit
-            ASSET.forceApprove(adapters[i], adapterAmount);
-            uint256 shares = IAdapter(adapters[i]).deposit(adapterAmount);
-            
-            // Validate return value (prevent silent failures)
-            if (shares == 0) revert DepositReturnedZero();
-            
-            ASSET.forceApprove(adapters[i], 0);
+            if (adapterAmount > 0) {
+                // Approve and deposit
+                ASSET.forceApprove(adapters[i], adapterAmount);
+                IAdapter(adapters[i]).deposit(adapterAmount);
+                ASSET.forceApprove(adapters[i], 0);
+            }
         }
     }
 

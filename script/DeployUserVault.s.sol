@@ -69,8 +69,10 @@ contract DeployUserVault is Script {
 
         // ============ STEP 4: Deploy UserVault ============
         console.log("[4/7] Deploying UserVault...");
-        vault = new UserVault(address(usdc));
+        // Deploy with msg.sender as initial pause owner (Guardian/Multisig)
+        vault = new UserVault(address(usdc), msg.sender);
         console.log("  UserVault:", address(vault));
+        console.log("  Pause Owner:", msg.sender);
         console.log("");
 
         // ============ STEP 5: Deploy Adapters ============

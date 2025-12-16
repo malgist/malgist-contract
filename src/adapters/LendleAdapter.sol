@@ -26,16 +26,16 @@ contract LendleAdapter is IAdapter {
     using SafeERC20 for IERC20;
 
     /// @notice The underlying asset this adapter manages (e.g., USDC)
-    IERC20 private immutable _ASSET;
+    IERC20 public immutable ASSET;
 
     /// @notice The Lendle lending pool contract
-    ILendingPool private immutable _LENDING_POOL;
+    ILendingPool public immutable LENDING_POOL;
 
     /// @notice The vault address that owns this adapter
-    address private immutable _VAULT;
+    address public immutable VAULT;
 
     /// @notice The aToken received from lending pool (e.g., aUSDC)
-    address private immutable _A_TOKEN;
+    address public immutable A_TOKEN;
 
     /// @notice Emitted when tokens are deposited to Lendle
     event DepositedToLendle(uint256 amount, uint256 aTokensReceived);
@@ -49,7 +49,7 @@ contract LendleAdapter is IAdapter {
     error ReserveNotInitialized();
 
     modifier onlyVault() {
-        if (msg.sender != _VAULT) revert OnlyVault();
+        if (msg.sender != VAULT) revert OnlyVault();
         _;
     }
 
@@ -60,14 +60,14 @@ contract LendleAdapter is IAdapter {
      * @param vault The UniversalVault address that will call this adapter
      */
     constructor(address asset, address lendingPool, address vault) {
-        _ASSET = IERC20(asset);
-        _LENDING_POOL = ILendingPool(lendingPool);
-        _VAULT = vault;
+        ASSET = IERC20(asset);
+        LENDING_POOL = ILendingPool(lendingPool);
+        VAULT = vault;
 
         // Get the aToken address from the pool
         address aToken = ILendingPool(lendingPool).getReserveToken(asset);
         if (aToken == address(0)) revert ReserveNotInitialized();
-        _A_TOKEN = aToken;
+        A_TOKEN = aToken;
     }
 
     /**
@@ -79,22 +79,22 @@ contract LendleAdapter is IAdapter {
         if (amount == 0) revert InvalidAmount();
 
         // Get balance before supply
-        uint256 aTokenBalanceBefore = IERC20(_A_TOKEN).balanceOf(address(this));
+        uint256 aTokenBalanceBefore = IERC20(A_TOKEN).balanceOf(address(this));
 
         // Transfer tokens from vault to this contract
-        _ASSET.safeTransferFrom(msg.sender, address(this), amount);
+        ASSET.safeTransferFrom(msg.sender, address(this), amount);
 
         // Approve lending pool to spend the asset
-        _ASSET.forceApprove(address(_LENDING_POOL), amount);
+        ASSET.forceApprove(address(LENDING_POOL), amount);
 
         // Supply to Lendle (aTokens minted to this contract)
-        _LENDING_POOL.supply(address(_ASSET), amount, address(this), 0);
+        LENDING_POOL.supply(address(ASSET), amount, address(this), 0);
 
         // Reset approval
-        _ASSET.forceApprove(address(_LENDING_POOL), 0);
+        ASSET.forceApprove(address(LENDING_POOL), 0);
 
         // Calculate aTokens received
-        uint256 aTokenBalanceAfter = IERC20(_A_TOKEN).balanceOf(address(this));
+        uint256 aTokenBalanceAfter = IERC20(A_TOKEN).balanceOf(address(this));
         shares = aTokenBalanceAfter - aTokenBalanceBefore;
 
         emit DepositedToLendle(amount, shares);
@@ -110,19 +110,22 @@ contract LendleAdapter is IAdapter {
         if (amount == 0) revert InvalidAmount();
 
         // Get aToken balance before withdrawal
-        uint256 aTokenBalanceBefore = IERC20(_A_TOKEN).balanceOf(address(this));
+        uint256 aTokenBalanceBefore = IERC20(A_TOKEN).balanceOf(address(this));
 
         // Approve lending pool to burn aTokens
-        IERC20(_A_TOKEN).forceApprove(address(_LENDING_POOL), amount);
+        IERC20(A_TOKEN).forceApprove(address(LENDING_POOL), amount);
 
-        // Withdraw from Lendle (sends underlying to vault)
-        withdrawn = _LENDING_POOL.withdraw(address(_ASSET), amount, _VAULT);
+        // Withdraw from Lendle (sends underlying to THIS adapter, then we transfer to vault)
+        withdrawn = LENDING_POOL.withdraw(address(ASSET), amount, address(this));
 
         // Reset approval
-        IERC20(_A_TOKEN).forceApprove(address(_LENDING_POOL), 0);
+        IERC20(A_TOKEN).forceApprove(address(LENDING_POOL), 0);
+
+        // Transfer withdrawn assets to vault
+        ASSET.safeTransfer(VAULT, withdrawn);
 
         // Calculate aTokens burned
-        uint256 aTokenBalanceAfter = IERC20(_A_TOKEN).balanceOf(address(this));
+        uint256 aTokenBalanceAfter = IERC20(A_TOKEN).balanceOf(address(this));
         uint256 aTokensBurned = aTokenBalanceBefore - aTokenBalanceAfter;
 
         emit WithdrawnFromLendle(withdrawn, aTokensBurned);
@@ -134,7 +137,7 @@ contract LendleAdapter is IAdapter {
      * @return balance Current aToken balance
      */
     function getBalance() external view returns (uint256 balance) {
-        return IERC20(_A_TOKEN).balanceOf(address(this));
+        return IERC20(A_TOKEN).balanceOf(address(this));
     }
 
     /**
@@ -142,7 +145,7 @@ contract LendleAdapter is IAdapter {
      * @return tokenAddress The underlying asset this adapter manages
      */
     function token() external view returns (address tokenAddress) {
-        return address(_ASSET);
+        return address(ASSET);
     }
 
     /**
@@ -150,7 +153,7 @@ contract LendleAdapter is IAdapter {
      * @return The aToken address for this adapter
      */
     function getAToken() external view returns (address) {
-        return _A_TOKEN;
+        return A_TOKEN;
     }
 
     /**
@@ -158,6 +161,6 @@ contract LendleAdapter is IAdapter {
      * @return The Lendle lending pool address
      */
     function getLendingPool() external view returns (address) {
-        return address(_LENDING_POOL);
+        return address(LENDING_POOL);
     }
 }

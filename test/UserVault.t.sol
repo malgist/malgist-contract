@@ -23,6 +23,8 @@ contract UserVaultTest is Test {
     address public bob = address(0x2);
     address public charlie = address(0x3);
 
+    address public guardian = address(0x999); // Pause owner/guardian
+
     uint256 constant INITIAL_BALANCE = 10000e6; // 10,000 USDC
     uint256 constant DEPOSIT_AMOUNT = 1000e6; // 1,000 USDC
 
@@ -35,8 +37,8 @@ contract UserVaultTest is Test {
         lendingPool = new MockLendingPool();
         lendingPool.setReserveToken(address(usdc), address(aUsdc));
 
-        // Deploy vault
-        vault = new UserVault(address(usdc));
+        // Deploy vault with guardian as pause owner
+        vault = new UserVault(address(usdc), guardian);
 
         // Deploy adapter
         lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
