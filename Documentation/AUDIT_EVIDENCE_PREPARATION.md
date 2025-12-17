@@ -15,6 +15,7 @@
 **Must Include**:
 
 1. **System Components**
+
    - UserVault: Core deposit/withdraw and strategy management
    - StrategyRegistry: Permissionless strategy creation + phase control
    - FeeManager: Fee calculation and distribution
@@ -23,6 +24,7 @@
    - Adapters: External protocol integration layer
 
 2. **Data Flow Diagrams**
+
    ```
    User → Vault → Adapters → External Protocols
               ↓
@@ -30,18 +32,21 @@
    ```
 
 3. **Component Interactions**
+
    - Vault → Registry: Strategy creation, version checks
    - Vault → Adapters: Deposit, withdraw, getBalance
    - Vault → FeeManager: Fee charging on yield
    - Vault → EmergencyPause: Pause state checks
 
 4. **Deployment Architecture**
+
    - Contract addresses (placeholder for auditor review)
    - Proxy pattern (if used): UUPS, Transparent, or none
    - Ownership model: Single owner, multisig, timelock
    - Initialization sequence
 
 5. **Call Sequences** (key user flows)
+
    ```
    DEPOSIT FLOW:
    1. User calls vault.deposit(amount)
@@ -73,6 +78,7 @@
 # MALGIST Threat Model
 
 ## External Threat Actors
+
 1. **MEV Extractors**: Sandwich attacks, front-running deposits
 2. **Social Engineers**: Trick users into copying risky strategies
 3. **Rogue Adapter Operators**: Deploy malicious adapters to steal funds
@@ -80,6 +86,7 @@
 5. **Governance Attackers**: Acquire governance tokens to change critical parameters
 
 ## Internal Threat Scenarios
+
 1. **Reentrancy**: Recursive calls exploit state inconsistencies
 2. **Precision Loss**: Rounding errors cause accounting mismatches
 3. **Access Control Bypass**: Unguarded state modifications
@@ -87,15 +94,17 @@
 5. **Sandwich Attacks**: MEV extraction during swap operations
 
 ## Mitigations Implemented
-| Threat | Mitigation |
-|--------|-----------|
-| Reentrancy | ReentrancyGuard on all external state-changing functions |
-| Precision Loss | Checked arithmetic, explicit remainder handling |
-| Access Control | Owner-gated admin functions; role-based access (pause owner, registrar) |
-| State Corruption | Invariant validation after each operation; reconciliation |
-| Sandwich Attacks | Slippage checks (minAmountOut), deadline validation |
+
+| Threat           | Mitigation                                                              |
+| ---------------- | ----------------------------------------------------------------------- |
+| Reentrancy       | ReentrancyGuard on all external state-changing functions                |
+| Precision Loss   | Checked arithmetic, explicit remainder handling                         |
+| Access Control   | Owner-gated admin functions; role-based access (pause owner, registrar) |
+| State Corruption | Invariant validation after each operation; reconciliation               |
+| Sandwich Attacks | Slippage checks (minAmountOut), deadline validation                     |
 
 ## Residual Risk (Accepted)
+
 - **Adapter Counterparty Risk**: If external protocol fails, adapter funds at risk
 - **Oracle Risk**: Adapter quotes are point-in-time; may be stale
 - **MEV Residual**: Slippage checks mitigate but do not eliminate MEV
@@ -115,6 +124,7 @@
 ## Trusted Entities
 
 ### Owner / Governance
+
 - Assumed to be **trusted** (multisig or timelock recommended)
 - Responsibilities:
   - Register adapters
@@ -123,12 +133,14 @@
   - Deploy emergency pause
 
 ### Pause Owner (Guardian)
+
 - Assumed to be **trusted** (multisig or emergency multisig)
 - Responsibilities:
   - Activate/deactivate emergency pause
   - Reconcile adapter balances
 
 ### Adapter Operators
+
 - Assumed to be **trusted** (whitelist-only)
 - Adapter code assumed to be **reviewed and non-malicious**
 - But: May integrate with faulty external protocols
@@ -136,28 +148,33 @@
 ## External Untrusted Entities
 
 ### Users
+
 - Assumed to be **economically rational** but not trusted with:
   - State modification (only vault owner can modify state)
   - Fund movement outside approved paths (only via deposit/withdraw)
 
 ### External Protocols (Aave, Lido, DEX, etc.)
+
 - Assumed to be **non-malicious but may fail**:
   - May return fewer tokens than expected (revert on slippage)
   - May be exploited (external protocol hack)
   - May pause operations (upgrade, emergency)
 
 ### Off-Chain Actors (Bots, MEV Extractors)
+
 - Assumed to be **adversarial**
 - Mitigations: Slippage checks, deadline validation
 
 ## Implicit Trust on Standards Compliance
 
 ### ERC20 Compliance
+
 - Assume all tokens implement ERC20 standard correctly
 - **Known limitation**: Rebasing tokens, fee-on-transfer tokens will break vault accounting
 - **Recommendation**: Whitelist token list explicitly; disable rebasing tokens
 
 ### Adapter Interface Compliance
+
 - All adapters must implement IAdapter interface correctly
 - Assume adapters return correct balance, handle deposits/withdrawals properly
 - **Trust**: Adapter code reviewed by auditor + governance
@@ -167,20 +184,22 @@
 ## Failure Mode Analysis
 
 ### If Owner is Compromised
+
 - Risk: Attacker can register malicious adapters, change parameters
 - Mitigation: Timelock for critical changes; community governance override
 - Recovery: Replace owner via governance vote
 
 ### If External Protocol is Exploited
+
 - Risk: Funds in that adapter may be at risk
 - Mitigation: Emergency pause to prevent further deposits
 - Recovery: emergencyWithdraw() or direct adapter recovery
 
 ### If Adapter Code is Malicious
+
 - Risk: Adapter can steal funds from vault
 - Mitigation: Adapter whitelist-only; code review before registration
 - Recovery: Remove adapter from strategies; user-initiated migration
-
 ```
 
 ---
@@ -197,46 +216,54 @@
 # MALGIST Critical Invariants
 
 ## Invariant 1: Total Shares Consistency
+
 Property: totalShares == sum(userShares[user] for all users)
 Validation Point: After every deposit/withdraw/transfer
 Violation: Contract enters invalid state; vault is broken
 
 ## Invariant 2: Total Assets Lower Bound
+
 Property: totalAssets >= sum(adapterCached[adapter] for all adapters)
 Validation Point: After reconciliation
 Violation: Vault insolvent; withdrawals may fail
 
 ## Invariant 3: Strategy Validity
+
 Property: For each strategy: adapters.length == ratios.length > 0
-           sum(ratios) == TOTAL_BPS (10000)
+sum(ratios) == TOTAL_BPS (10000)
 Validation Point: On setStrategy() call
 Violation: Strategy execution produces undefined behavior
 
 ## Invariant 4: Adapter Balance Accuracy (Post-Reconciliation)
+
 Property: adapterCached[adapter] == IAdapter(adapter).getBalance()
 Validation Point: After reconcileAdapter() call
 Violation: Vault accounting diverges from actual holdings
 
 ## Invariant 5: Pause Isolation
+
 Property: If globalPause == true: deposits blocked, withdrawals allowed
-           If adapterPaused[adapter] == true: only that adapter blocked
+If adapterPaused[adapter] == true: only that adapter blocked
 Validation Point: deposit() pre-check
 Violation: User assets may be locked or accessible incorrectly
 
 ## Invariant 6: Phase Enforcement (Limited Phase)
+
 Property: For strategies in Limited phase: totalDeposited[strategy] <= getLimitedCap(strategy)
 Validation Point: deposit() enforcement
 Violation: TVL cap bypassed; protocol risk exceeded
 
 ## Invariant 7: Fee Consistency
+
 Property: creatorFee + protocolFee <= grossYield
 Validation Point: FeeManager.chargeFees() calculation
 Violation: User receives negative yield (rounding error)
 
 ## Invariant 8: Strategy Registry Integrity
+
 Property: Each strategyId has at most one creator
-           Duplicate riskDisclosureHash not allowed
-           creatorStrategyCount[creator] <= maxStrategiesPerAddress
+Duplicate riskDisclosureHash not allowed
+creatorStrategyCount[creator] <= maxStrategiesPerAddress
 Validation Point: registerStrategy() call
 Violation: Duplicate strategy registration or creator spam
 ```
@@ -253,9 +280,11 @@ Violation: Duplicate strategy registration or creator spam
 ## Function: UserVault.deposit(uint256 amount)
 
 ### Signature
+
 external nonReentrant whenDepositsNotPaused returns (uint256 shares)
 
 ### Preconditions
+
 - User has called ASSET.approve(address(vault), amount)
 - amount > 0
 - User has called setStrategy() at least once
@@ -264,6 +293,7 @@ external nonReentrant whenDepositsNotPaused returns (uint256 shares)
 - User's adopted strategy version is NOT deprecated
 
 ### Postconditions
+
 - User's share balance increased by `shares`
 - totalShares increased by `shares`
 - totalAssets increased by amount (net of copy fee)
@@ -273,6 +303,7 @@ external nonReentrant whenDepositsNotPaused returns (uint256 shares)
 - Deposited event emitted
 
 ### Error Conditions
+
 - InvalidAmount() if amount == 0
 - NoStrategySet() if user has no strategy
 - AdapterPausedError() if any adapter is paused
@@ -282,15 +313,18 @@ external nonReentrant whenDepositsNotPaused returns (uint256 shares)
 - VaultPaused() if global pause active (EmergencyPause)
 
 ### Gas Efficiency Notes
+
 - O(N) where N = number of adapters in strategy
 - Caches adapter count to minimize SLOADs
 - Uses unchecked increments in loop
 
 ### Reentrancy Protection
+
 - ReentrancyGuard active; prevents recursive calls
 - Checks-Effects-Interactions: All validation before transfers
 
 ### State Invariants Maintained
+
 - totalShares == sum(userShares[user])
 - totalAssets == sum(adapterCached[adapter])
 - User shares always correspond to asset ownership
@@ -303,22 +337,26 @@ external nonReentrant whenDepositsNotPaused returns (uint256 shares)
 ### 3.1 Slither Static Analysis
 
 **Command**:
+
 ```bash
 slither . --json > slither-report.json
 slither . --sarif > slither-report.sarif
 ```
 
-**Deliverable**: 
+**Deliverable**:
+
 - JSON output (machine-readable)
 - SARIF output (IDE-compatible)
 - HTML report (human-readable)
 
 **Issues to Document**:
+
 - [ ] No CRITICAL/HIGH issues
 - [ ] All MEDIUM issues documented in severity tracker
 - [ ] LOW/INFORMATIONAL issues prioritized
 
 **Sample Output Section**:
+
 ```json
 {
   "issues": [
@@ -327,7 +365,7 @@ slither . --sarif > slither-report.sarif
       "impact": "HIGH",
       "confidence": "MEDIUM",
       "description": "...",
-      "source": {"filename": "src/UserVault.sol", "start": 123}
+      "source": { "filename": "src/UserVault.sol", "start": 123 }
     }
   ]
 }
@@ -338,21 +376,25 @@ slither . --sarif > slither-report.sarif
 ### 3.2 Coverage Report
 
 **Command**:
+
 ```bash
 forge coverage --report lcov --report html
 ```
 
 **Deliverable**:
+
 - `coverage/coverage.html` (browser-viewable)
 - `coverage/coverage.lcov` (Codecov format)
 - Summary statistics
 
 **Target Metrics**:
+
 - Line coverage: >= 85%
 - Branch coverage: >= 80%
 - Function coverage: >= 95%
 
 **Sample Coverage Report**:
+
 ```
 File                      | Stmts | Branch | Funcs | Lines |
 --------------------------|-------|--------|-------|-------|
@@ -363,6 +405,7 @@ TOTAL                     | 87%   | 81%    | 94%   | 87%   |
 ```
 
 **Uncovered Code Identified**:
+
 - [ ] Reason documented (e.g., "Error path that reverts")
 - [ ] Non-critical paths marked as acceptable
 - [ ] Critical paths require test case addition
@@ -372,6 +415,7 @@ TOTAL                     | 87%   | 81%    | 94%   | 87%   |
 ### 3.3 Gas Benchmark Report
 
 **Command**:
+
 ```bash
 forge test --gas-report > gas-report.txt
 forge test --gas-report --reporter json > gas-report.json
@@ -379,14 +423,15 @@ forge test --gas-report --reporter json > gas-report.json
 
 **Key Functions to Benchmark**:
 
-| Function | Min Gas | Avg Gas | Max Gas | Purpose |
-|----------|---------|---------|---------|---------|
-| deposit | ~85k | ~350k | ~450k | User deposit (varies by adapter count) |
-| withdraw | ~110k | ~135k | ~160k | User withdrawal |
-| setStrategy | ~25k | ~250k | ~410k | Strategy setup (varies by adapter count) |
-| registerStrategy | TBD | TBD | TBD | Strategy registration |
+| Function         | Min Gas | Avg Gas | Max Gas | Purpose                                  |
+| ---------------- | ------- | ------- | ------- | ---------------------------------------- |
+| deposit          | ~85k    | ~350k   | ~450k   | User deposit (varies by adapter count)   |
+| withdraw         | ~110k   | ~135k   | ~160k   | User withdrawal                          |
+| setStrategy      | ~25k    | ~250k   | ~410k   | Strategy setup (varies by adapter count) |
+| registerStrategy | TBD     | TBD     | TBD     | Strategy registration                    |
 
 **Gas Optimizations Documented**:
+
 - Storage packing reduces SLOAD costs
 - Loop optimizations cache array lengths
 - Custom errors instead of require strings
@@ -397,6 +442,7 @@ forge test --gas-report --reporter json > gas-report.json
 ### 3.4 Build Determinism Verification
 
 **Command**:
+
 ```bash
 forge build --verify
 forge build --verify --build-info
@@ -404,6 +450,7 @@ shasum -a 256 out/UserVault.sol/UserVault.json
 ```
 
 **Deliverable**:
+
 - Build hash recorded: `[HASH]`
 - Bytecode matches across clean builds
 - Compiler version pinned: Solidity ^0.8.20
@@ -420,24 +467,28 @@ shasum -a 256 out/UserVault.sol/UserVault.json
 
 ```markdown
 ## Unit Tests (70% coverage)
+
 - UserVault: deposit, withdraw, strategy setup, copy fee tracking
 - StrategyRegistry: phase transitions, creator limits, duplicate detection
 - FeeManager: fee calculation, distribution, authorization
 - EmergencyPause: pause activation, isolation, emergency withdrawal
 
 ## Integration Tests (15% coverage)
+
 - Full deposit → strategy → rebalance → withdraw flow
 - Strategy copy → deposit → separate accounting
 - Multi-adapter strategy execution
 - Phase transitions and TVL cap enforcement
 
 ## Security Tests (10% coverage)
+
 - Reentrancy detection (ReentrancyGuard validation)
 - Access control verification
 - Invariant violation tests (should revert)
 - Slippage protection bypass attempts
 
 ## Fuzz Tests (5% coverage)
+
 - Random deposit/withdraw sequences
 - Random adapter configurations
 - Random strategy parameters
@@ -454,17 +505,18 @@ shasum -a 256 out/UserVault.sol/UserVault.json
 ## Regression Tests
 
 ### Test: test_no_reentrancy_on_deposit()
+
 **Issue**: [If found] Reentrancy vulnerability in deposit
 **Test Purpose**: Verify ReentrancyGuard blocks recursive calls
 **Implementation**: Mock adapter that calls back into vault
 **Expected**: Revert with reentrancy error
 
 ### Test: test_total_shares_invariant_after_deposit()
+
 **Issue**: Total shares inconsistency
 **Test Purpose**: Verify totalShares == sum(userShares) post-deposit
 **Implementation**: Deposit from multiple users; check accounting
 **Expected**: Invariant maintained
-
 ```
 
 ---
@@ -479,19 +531,16 @@ Before sending to auditors, verify:
   - [ ] Trust assumptions
   - [ ] Invariants list
   - [ ] Function specifications
-  
 - [ ] **Code**
   - [ ] Feature-frozen (no active development)
   - [ ] Git tag created: `audit-v1.0`
   - [ ] Build verification: Deterministic bytecode confirmed
   - [ ] All tests passing: `forge test` → 0 failures
-  
 - [ ] **Analysis**
   - [ ] Slither report: No CRITICAL/HIGH issues
   - [ ] Coverage report: >= 85% line coverage
   - [ ] Gas report: Baseline metrics
   - [ ] Build info: Compiler version pinned
-  
 - [ ] **Artifacts**
   - [ ] ABI files: `out/UserVault.json`, etc.
   - [ ] Source flattened (optional): For easy auditor reading
@@ -513,6 +562,7 @@ Before sending to auditors, verify:
 ### 6.2 Version Hash Tracking
 
 **Contract Deployment**:
+
 ```solidity
 contract UserVault {
     // Audit version and hash immutable for transparency
@@ -522,6 +572,7 @@ contract UserVault {
 ```
 
 **Event on Deployment**:
+
 ```solidity
 event AuditVersionDeployed(
     string indexed version,

@@ -13,6 +13,7 @@
 MALGIST commits to **complete transparency** regarding security audit findings and resolutions.
 
 **Core Principles**:
+
 1. **Honesty**: No hiding or downplaying of findings
 2. **Clarity**: Non-technical community can understand risks
 3. **Timeliness**: Disclose findings as soon as resolved (not delayed)
@@ -21,6 +22,7 @@ MALGIST commits to **complete transparency** regarding security audit findings a
 ### 1.2 What Will Be Published
 
 #### **For All Audit Reports**:
+
 - ✓ Executive summary (non-technical overview)
 - ✓ List of all issues by severity
 - ✓ Status of each issue (FIXED / ACCEPTED / OUT-OF-SCOPE)
@@ -30,6 +32,7 @@ MALGIST commits to **complete transparency** regarding security audit findings a
 - ✓ Audit date + scope
 
 #### **Per Finding**:
+
 - ✓ Issue description (what was wrong)
 - ✓ Severity (CRITICAL / HIGH / MEDIUM / LOW)
 - ✓ Impact (what could go wrong for users)
@@ -39,6 +42,7 @@ MALGIST commits to **complete transparency** regarding security audit findings a
 - ✓ If accepted: Risk mitigation + monitoring plan
 
 #### **Will NOT Be Published** (until mainnet deployment):
+
 - ✗ Specific vulnerability details that could be exploited before fix
 - ✗ Unreleased zero-days in external protocols
 - ✗ Audit firm internal communications
@@ -49,16 +53,19 @@ MALGIST commits to **complete transparency** regarding security audit findings a
 ## Part 2: Public Communication Timeline
 
 ### 2.1 Pre-Audit Phase
+
 **Actions**:
+
 - Announce audit engagement (firm name, timeline, scope)
 - Invite community feedback on scope priorities
 - Set expectations on timeline (e.g., "6-8 week audit, re-audit 2-3 weeks")
 
 **Template**:
+
 ```
 MALGIST AUDIT ANNOUNCEMENT
 ──────────────────────────
-We are pleased to announce that [AUDITOR_NAME] will conduct 
+We are pleased to announce that [AUDITOR_NAME] will conduct
 a comprehensive security audit of MALGIST contracts.
 
 Scope: UserVault, StrategyRegistry, FeeManager, adapters
@@ -67,7 +74,7 @@ Re-Audit: [RE_AUDIT_DATE] (~2 weeks)
 
 Focus Areas:
 - Adapter integration security
-- Permissionless strategy creation controls  
+- Permissionless strategy creation controls
 - Emergency pause mechanism effectiveness
 - Fee distribution correctness
 
@@ -77,12 +84,15 @@ We welcome community input. Please submit suggestions to [FORUM_LINK].
 ---
 
 ### 2.2 Audit In Progress
+
 **Actions**:
+
 - Share progress updates (bi-weekly summary)
 - Do NOT disclose specific findings during audit (maintain auditor confidentiality)
 - Answer high-level questions about scope/methodology
 
 **Template**:
+
 ```
 MALGIST AUDIT PROGRESS UPDATE
 ─────────────────────────────
@@ -90,7 +100,7 @@ Week 4 of 8: Initial findings phase
 
 Activities:
 ✓ Architecture review complete
-✓ Code walkthrough completed  
+✓ Code walkthrough completed
 → In progress: Security analysis of adapter integration
 → In progress: Invariant verification testing
 
@@ -103,12 +113,15 @@ Next Update: [DATE]
 ---
 
 ### 2.3 Audit Complete (Before Re-Audit)
+
 **Actions**:
+
 - Receive final audit report from firm
 - Notify community that audit complete; re-audit in progress
 - Do NOT publish findings yet (give team time to fix CRITICAL/HIGH)
 
 **Template**:
+
 ```
 MALGIST AUDIT PHASE 1 COMPLETE
 ──────────────────────────────
@@ -118,7 +131,7 @@ Summary:
 - Total issues found: [N]
 - CRITICAL: [N] (all being fixed)
 - HIGH: [N] (all being fixed)
-- MEDIUM: [N] (fixing or accepting)  
+- MEDIUM: [N] (fixing or accepting)
 - LOW/INFO: [N] (advisory)
 
 Next Phase: Re-Audit (2-3 weeks)
@@ -131,12 +144,15 @@ Detailed Report: Will be published post-re-audit completion
 ---
 
 ### 2.4 Re-Audit In Progress
+
 **Actions**:
+
 - Share re-audit progress
 - Prepare final disclosure package (report, fixes, risk acceptances)
 - Engage legal/compliance on final disclosure
 
 **Template**:
+
 ```
 MALGIST RE-AUDIT IN PROGRESS
 ────────────────────────────
@@ -155,13 +171,16 @@ Final Report: Expected [DATE]
 ---
 
 ### 2.5 Audit Complete (Final)
+
 **Actions**:
+
 - Publish complete audit report
 - Announce deployment timeline
 - Provide risk summary for users
 - Engage with community feedback
 
 **Template**:
+
 ```
 MALGIST AUDIT COMPLETE - MAINNET DEPLOYMENT ROADMAP
 ────────────────────────────────────────────────────
@@ -233,13 +252,13 @@ SECTION 3: FINDINGS BY SEVERITY
     - Issue: [Description]
     - Impact: [What could go wrong]
     - Status: FIXED [Commit] / ACCEPTED [Justification]
-    
+
 ─ HIGH (all should be fixed)
   - [Finding Title]
-  
+
 ─ MEDIUM (fixed or accepted)
   - [Finding Title]
-  
+
 ─ LOW / INFORMATIONAL (optional)
 
 SECTION 4: RISK ASSESSMENT
@@ -256,6 +275,7 @@ SECTION 5: APPENDIX
 ### 3.2 Recommendation Text Examples
 
 **For FIXED issues**:
+
 ```
 ISSUE AUD-XXX: [Title]
 SEVERITY: [HIGH]
@@ -282,13 +302,14 @@ Recommendation: ✓ SAFE FOR DEPLOYMENT
 ```
 
 **For ACCEPTED MEDIUM issues**:
+
 ```
 ISSUE AUD-XXX: MEV Sandwich Risk
-SEVERITY: MEDIUM  
+SEVERITY: MEDIUM
 STATUS: ACCEPTED
 
 Description:
-User deposits may be sandwiched by MEV extractors, resulting in worse 
+User deposits may be sandwiched by MEV extractors, resulting in worse
 execution than expected swap price.
 
 Root Cause:
@@ -319,6 +340,7 @@ Recommendation: ✓ ACCEPTABLE FOR DEPLOYMENT (with monitoring)
 ### 4.1 Mainnet Launch Announcement
 
 **Template**:
+
 ```
 MALGIST MAINNET LAUNCH
 ──────────────────────
@@ -396,7 +418,7 @@ NEXT UPDATE: [DATE/TIME]
 string public constant AUDIT_VERSION = "1.0";
 
 /// @notice IPFS hash of complete audit report
-bytes32 public constant AUDIT_REPORT_HASH = 
+bytes32 public constant AUDIT_REPORT_HASH =
     keccak256(abi.encodePacked("QmXxxxx...")); // IPFS CID hash
 
 /// @notice Deployment audit hash (keccak256 of audit report CID)
@@ -416,6 +438,7 @@ constructor(...) {
 ```
 
 **Benefits**:
+
 - Immutable on-chain proof of audit date
 - Enables future smart contracts to verify audit status
 - Transparent to any blockchain explorer
@@ -436,9 +459,9 @@ contract AuditRegistry {
         uint256 deploymentTimestamp;
         string ipfsLink;
     }
-    
+
     mapping(address => AuditRecord) public auditedContracts;
-    
+
     function registerAudit(
         address contractAddr,
         string calldata version,
@@ -464,12 +487,14 @@ contract AuditRegistry {
 ### 6.1 Pre-Audit Checklist (30 days before audit)
 
 - [ ] **Code Freeze**
+
   - [ ] All features implemented
   - [ ] No active development branches
   - [ ] Git tag created: `git tag -a audit-v1.0`
   - [ ] Commit hash recorded: `[SHA]`
 
 - [ ] **Documentation Complete**
+
   - [ ] Architecture overview drafted
   - [ ] Threat model documented
   - [ ] Invariants list completed
@@ -477,6 +502,7 @@ contract AuditRegistry {
   - [ ] Function specifications written
 
 - [ ] **Testing Complete**
+
   - [ ] Unit tests: 85%+ coverage
   - [ ] Integration tests: All critical paths covered
   - [ ] Fuzz testing: 1000+ runs without crashes
@@ -484,12 +510,14 @@ contract AuditRegistry {
   - [ ] All tests passing: `forge test` → 0 failures
 
 - [ ] **Static Analysis**
+
   - [ ] Slither run: No CRITICAL/HIGH issues
   - [ ] Coverage report generated
   - [ ] Gas benchmarks established
   - [ ] Build determinism verified
 
 - [ ] **Audit Engagement**
+
   - [ ] Auditor selected + contacted
   - [ ] Scope document signed
   - [ ] NDA signed
@@ -509,6 +537,7 @@ contract AuditRegistry {
 ### 6.2 Post-Audit Action Checklist (After re-audit completion)
 
 - [ ] **Report Review**
+
   - [ ] Final report received + reviewed
   - [ ] All CRITICAL fixed + verified
   - [ ] All HIGH fixed + verified
@@ -516,18 +545,21 @@ contract AuditRegistry {
   - [ ] Legal/compliance approved disclosure
 
 - [ ] **Disclosure Preparation**
+
   - [ ] Executive summary drafted
   - [ ] Risk summary prepared
   - [ ] User communication templates ready
   - [ ] Issue-by-issue disclosure finalized
 
 - [ ] **On-Chain Integration**
+
   - [ ] Audit hash embedded in contract
   - [ ] Deployment event prepared
   - [ ] Version constants updated
   - [ ] Audit registry updated (if applicable)
 
 - [ ] **Public Communication**
+
   - [ ] Audit report published (PDF + IPFS)
   - [ ] Executive summary posted
   - [ ] Mainnet launch announcement prepared
@@ -535,6 +567,7 @@ contract AuditRegistry {
   - [ ] Governance vote (if required)
 
 - [ ] **Deployment Preparation**
+
   - [ ] Mainnet parameters finalized
   - [ ] Pause owner identified (multisig address)
   - [ ] Initial adapter whitelist approved
@@ -542,6 +575,7 @@ contract AuditRegistry {
   - [ ] Emergency response plan activated
 
 - [ ] **Monitoring Setup**
+
   - [ ] Incident response team on standby
   - [ ] Monitoring dashboards live
   - [ ] Alert thresholds configured
@@ -574,6 +608,7 @@ contract AuditRegistry {
 ---
 
 ## Issue Summary
+
 [1-2 sentences describing the issue]
 
 [Detailed description]
@@ -581,6 +616,7 @@ contract AuditRegistry {
 ---
 
 ## Risk Analysis
+
 - **Likelihood**: [Low / Medium / High]
 - **Impact**: [Low / Medium / High]
 - **Exploitability**: [Easy / Moderate / Difficult]
@@ -588,11 +624,13 @@ contract AuditRegistry {
 ---
 
 ## Mitigation Strategy
+
 [Controls, monitoring, response plan]
 
 ---
 
 ## Cost-Benefit Analysis
+
 - **Fix Cost**: [Engineering effort]
 - **Risk Cost**: [Potential loss if materialized]
 - **Rationale**: [Why accept vs. fix]
@@ -600,9 +638,10 @@ contract AuditRegistry {
 ---
 
 ## Approval
-- Security Lead: _________ Date: _______
-- Protocol Lead: _________ Date: _______
-- Legal: _________ Date: _______
+
+- Security Lead: ****\_**** Date: **\_\_\_**
+- Protocol Lead: ****\_**** Date: **\_\_\_**
+- Legal: ****\_**** Date: **\_\_\_**
 
 ---
 ```
