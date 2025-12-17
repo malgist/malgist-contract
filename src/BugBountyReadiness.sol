@@ -365,7 +365,7 @@ abstract contract BugBountyReadiness is IBugBountyEvents, IBugBountyRoles {
         pure
         returns (int256 percentageChangeBps)
     {
-        if (oldValue == 0) return int256((newValue > 0) ? 10000 : 0);
+        if (oldValue == 0) return int256(uint256((newValue > 0) ? 10000 : 0));
         int256 change = int256(newValue) - int256(oldValue);
         percentageChangeBps = (change * 10000) / int256(oldValue);
     }

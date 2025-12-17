@@ -303,8 +303,8 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         // Ensure user's adopted strategy version is not marked deprecated (no deposits into deprecated versions)
         uint256 v = strategyVersion[msg.sender];
         if (address(strategyRegistry) != address(0) && v != 0) {
-            uint256 strategyId = _strategyIdForUser(msg.sender);
-            if (strategyRegistry.isVersionDeprecated(strategyId, v)) revert DeprecatedStrategy();
+            uint256 userStrategyId = _strategyIdForUser(msg.sender);
+            if (strategyRegistry.isVersionDeprecated(userStrategyId, v)) revert DeprecatedStrategy();
         }
 
         // Validate all adapters in strategy are operational (not paused)
@@ -340,8 +340,8 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         if (address(strategyRegistry) != address(0)) {
             try strategyRegistry.phase() returns (uint8 p) {
                 if (p == 1) {
-                    uint256 strategyId = _strategyIdForUser(msg.sender);
-                    uint256 cap = strategyRegistry.getLimitedCap(strategyId);
+                    uint256 registryStrategyId = _strategyIdForUser(msg.sender);
+                    uint256 cap = strategyRegistry.getLimitedCap(registryStrategyId);
                     if (cap > 0) {
                         if (strategies[msg.sender].totalDeposited + netAmount > cap) revert ExceedsLimitedTVL();
                     }

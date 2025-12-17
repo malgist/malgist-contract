@@ -18,38 +18,43 @@
 
 ### ✅ Critical Functions (Highest Bounty)
 
-| Function | Risk | Bounty |
-|----------|------|--------|
-| `deposit()` | Share inflation, fund loss | $25k+ |
-| `withdraw()` | Accounting mismatch, fund loss | $25k+ |
-| `_executeDeposit()` | Adapter callback attacks, fund routing errors | $20k+ |
-| `reconcileAdapter()` | Incorrect balance tracking, loss | $15k+ |
-| `setStrategyWithRisk()` | Invalid configuration, TVL cap bypass | $10k+ |
-| `rebalanceByEngine()` | Slippage exploitation, accounting corruption | $15k+ |
+| Function                | Risk                                          | Bounty |
+| ----------------------- | --------------------------------------------- | ------ |
+| `deposit()`             | Share inflation, fund loss                    | $25k+  |
+| `withdraw()`            | Accounting mismatch, fund loss                | $25k+  |
+| `_executeDeposit()`     | Adapter callback attacks, fund routing errors | $20k+  |
+| `reconcileAdapter()`    | Incorrect balance tracking, loss              | $15k+  |
+| `setStrategyWithRisk()` | Invalid configuration, TVL cap bypass         | $10k+  |
+| `rebalanceByEngine()`   | Slippage exploitation, accounting corruption  | $15k+  |
 
 ### ✅ Attack Vectors We Want You to Find
 
 1. **Share Inflation**
+
    - Minting more shares than proportional to deposit
    - Rounding exploits in share calculation
    - Precision loss in favor of attacker
 
 2. **Fund Loss**
+
    - Withdrawal returns less than expected
    - Adapter callback reentrancy
    - Incomplete adapter deposits
 
 3. **Accounting Bypass**
+
    - totalShares != sum(userShares)
    - totalAssets != sum(adapterCached)
    - Strategy copy fee bypass
 
 4. **Adapter Routing Exploits**
+
    - Funds sent to wrong adapter
    - Adapter ratio manipulation
    - Incomplete adapter execution
 
 5. **Fee Logic Exploits**
+
    - Double-charging fees
    - Overflow in fee calculation
    - Unauthorized fee claiming
@@ -73,6 +78,7 @@
 ## 🚨 How to Report
 
 ### Step 1: Find the Bug
+
 - Write PoC in Solidity/TypeScript
 - Test locally (forge test / hardhat)
 - Document attack vector
@@ -83,6 +89,7 @@
 **HackenProof**: https://hackenproof.com/[PROGRAM_ID]
 
 **Include**:
+
 - ✓ Detailed description
 - ✓ Step-by-step reproduction
 - ✓ PoC code (commit hash friendly)
@@ -90,6 +97,7 @@
 - ✓ Suggested fix (optional but appreciated)
 
 ### Step 3: Verification
+
 - Security team reviews (48-72h)
 - Will request additional details if needed
 - Confirms severity level
@@ -99,14 +107,15 @@
 
 ## 💰 Bounty Tiers
 
-| Severity | Example | Bounty | Timeline |
-|----------|---------|--------|----------|
-| CRITICAL | Share inflation, complete fund loss | $25k - $100k+ | 15 days |
-| HIGH | TVL cap bypass, partial fund loss | $5k - $25k | 30 days |
-| MEDIUM | Monitoring bypass, unauthorized fee charge | $1k - $5k | 45 days |
-| LOW | Inefficient gas, non-critical precision loss | $100 - $1k | 60 days |
+| Severity | Example                                      | Bounty        | Timeline |
+| -------- | -------------------------------------------- | ------------- | -------- |
+| CRITICAL | Share inflation, complete fund loss          | $25k - $100k+ | 15 days  |
+| HIGH     | TVL cap bypass, partial fund loss            | $5k - $25k    | 30 days  |
+| MEDIUM   | Monitoring bypass, unauthorized fee charge   | $1k - $5k     | 45 days  |
+| LOW      | Inefficient gas, non-critical precision loss | $100 - $1k    | 60 days  |
 
 **Additional**:
+
 - First reporter only
 - PoC required for CRITICAL/HIGH
 - Duplicates: partial bounty to second reporter
@@ -160,6 +169,7 @@ event AdapterOperation(
 **Escalation**: security-lead@malgist.com (on-call)
 
 **Do NOT**:
+
 - ❌ Publicly disclose vulnerabilities
 - ❌ Exploit beyond PoC
 - ❌ Access other users' funds
@@ -205,12 +215,14 @@ forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 ## 📚 Key Documents
 
 **For Researchers**:
+
 - [BUG_BOUNTY_POLICY.md](./BUG_BOUNTY_POLICY.md) — Comprehensive scope definition
 - [AUDIT_READINESS_CHECKLIST.md](./AUDIT_READINESS_CHECKLIST.md) — Pre-audit work
 - [ISSUE_SEVERITY_POLICY.md](./ISSUE_SEVERITY_POLICY.md) — Severity classification
 - [COMPATIBILITY_CHECK.md](./COMPATIBILITY_CHECK.md) — Technical architecture
 
 **For Implementers**:
+
 - [BUG_BOUNTY_CHECKLIST.md](./BUG_BOUNTY_CHECKLIST.md) — Integration guide
 - [UserVault.sol](../src/UserVault.sol) — Main contract
 - [IAdapter.sol](../src/interfaces/IAdapter.sol) — Adapter interface
@@ -236,6 +248,7 @@ Before reporting a vulnerability:
 ## 🎁 Hall of Fame
 
 Recognized whitehats will be listed here:
+
 - [Coming soon]
 
 ---
