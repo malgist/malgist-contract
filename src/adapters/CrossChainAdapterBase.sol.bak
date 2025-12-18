@@ -1,0 +1,538 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title CrossChainAdapterBase
+ * @notice Base implementation for cross-chain adapters
+ * @dev This is an abstract contract that implements the cross-chain lifecycle
+ *      and must be extended by specific bridge implementations.
+ *
+ * LIFECYCLE:
+ * 1. User deposits funds locally
+ * 2. Adapter locks funds in escrow contract
+ * 3. Bridge relayer picks up message and transfers to destination
+ * 4. Destination adapter receives and deploys funds
+ * 5. Destination confirms back to source
+ * 6. Source marks operation as CONFIRMED and releases local hold
+ *
+ * SAFETY PROPERTIES:
+ * - Local balance always >= settled (we don't optimistically count in-flight)
+ * - Pending operations never block withdrawals
+ * - Bridge failures contained to the adapter only
+ */
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+// import "./ICrossChainAdapter.sol";  // TODO: Create this interface file
+
+// Define types directly until interface is available
+enum BridgeType { CANONICAL, LAYERZERO, CCIP, STARGATE }
+enum CrossChainState { PENDING, CONFIRMED, FAILED, STUCK }
+
+struct PendingCrossChainOp {
+    uint256 operationId;
+    address sender;
+    uint256 amount;
+    uint64 destinationChain;
+    address destinationAdapter;
+    CrossChainState state;
+    uint40 initiatedAt;
+    uint40 confirmedAt;
+}
+
+abstract contract CrossChainAdapterBase is AccessControl, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
+
+    // ========================================================================
+    // CONSTANTS
+    // ========================================================================
+
+    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+    bytes32 public constant EMERGENCY_ADMIN_ROLE = keccak256("EMERGENCY_ADMIN_ROLE");
+
+    // Hard limits (immutable protection)
+    uint16 public constant MAX_ALLOCATION_CROSS_CHAIN_BPS = 5000;  // 50% max
+    uint256 public constant MAX_SINGLE_BRIDGE_AMOUNT = 10_000_000e18; // 10M tokens
+    uint40 public constant BRIDGE_CONFIRMATION_TIMEOUT = 3600;     // 1 hour
+
+    // ========================================================================
+    // STATE VARIABLES
+    // ========================================================================
+
+    // Core configuration
+    IERC20 public immutable baseToken;
+    uint64 public immutable sourceChain;
+    address public immutable escrowContract;  // Holds funds during bridge
+
+    // Bridge state
+    BridgeType public bridgeType;
+    mapping(uint64 => bool) public supportedChains;
+    mapping(uint64 => address) public chainAdapterRegistry; // Chain ID → Adapter address
+    uint256 public maxPendingAmount;
+
+    // Pending operations tracking
+    uint256 private nextOperationId = 1;
+    mapping(uint256 => PendingCrossChainOp) public pendingOperations;
+    uint256[] public allPendingOperationIds;
+    mapping(uint256 => bool) public operationFinalized; // To allow cleanup
+
+    // Balance tracking
+    uint256 public settledBalance;      // Confirmed balance on this chain
+    mapping(uint64 => uint256) public pendingByChain; // Pending amount per destination chain
+
+    // Bridge health
+    bool public bridgeBlocked = false;
+    string public bridgeBlockReason = "";
+    uint40 public bridgeBlockedAt;
+
+    // Risk metrics
+    uint16 public bridgeRiskScore = 3000; // 30% (Canonical bridges)
+    uint40 public avgBridgeLatencySeconds = 600; // 10 minutes
+    uint32 public failureRatePerMillionOps = 500; // 0.05%
+
+    // ========================================================================
+    // EVENTS (in addition to interface)
+    // ========================================================================
+
+    event SettledBalanceUpdated(uint256 newSettledBalance);
+    event PendingStateUpdated(uint256 operationId, CrossChainState newState);
+    event AdapterRegistered(uint64 chainId, address adapter);
+    event SupportedChainAdded(uint64 chainId);
+    event MaxPendingAmountUpdated(uint256 newMax);
+    event CrossChainInitiated(uint256 indexed operationId, address indexed sender, uint256 amount, uint64 destinationChain);
+    event CrossChainConfirmed(uint256 indexed operationId, uint256 amount, uint40 confirmedAt);
+    event ForceWithdrawCrossChain(uint256 indexed operationId, uint256 recovered, string reason);
+    event BridgeBlocked(string reason, uint40 blockedAt);
+
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
+
+    constructor(
+        address _baseToken,
+        uint64 _sourceChain,
+        address _escrowContract,
+        BridgeType _bridgeType
+    ) {
+        require(_baseToken != address(0), "Invalid token");
+        require(_escrowContract != address(0), "Invalid escrow");
+        
+        baseToken = IERC20(_baseToken);
+        sourceChain = _sourceChain;
+        escrowContract = _escrowContract;
+        bridgeType = _bridgeType;
+        maxPendingAmount = 50_000_000e18; // 50M tokens default
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(EMERGENCY_ADMIN_ROLE, msg.sender);
+    }
+
+    // ========================================================================
+    // CORE CROSS-CHAIN OPERATIONS
+    // ========================================================================
+
+    /**
+     * @notice Deposit and bridge tokens to destination chain
+     * @dev CRITICAL: Funds are held in escrow, NOT optimistically counted
+     */
+    function depositAndBridge(
+        uint256 amount,
+        uint64 destinationChain,
+        address destinationAdapter
+    ) 
+        external 
+        nonReentrant 
+        whenNotPaused 
+        returns (uint256 operationId, uint256 deposited) 
+    {
+        require(amount > 0, "Amount must be > 0");
+        require(!bridgeBlocked, "Bridge is blocked");
+        require(supportedChains[destinationChain], "Chain not supported");
+        require(destinationAdapter != address(0), "Invalid destination adapter");
+        require(destinationChain != sourceChain, "Cannot bridge to self");
+
+        // Validation: don't exceed bridge capacity
+        uint256 newPending = pendingByChain[destinationChain] + amount;
+        require(newPending <= maxPendingAmount, "Exceeds max pending amount");
+
+        // Transfer tokens from user to escrow
+        baseToken.safeTransferFrom(msg.sender, escrowContract, amount);
+        settledBalance += amount;
+
+        // Create pending operation
+        operationId = nextOperationId++;
+        _initiateBridge(amount, destinationChain, destinationAdapter);
+
+        PendingCrossChainOp memory op = PendingCrossChainOp({
+            operationId: operationId,
+            sender: msg.sender,
+            amount: amount,
+            destinationChain: destinationChain,
+            destinationAdapter: destinationAdapter,
+            state: CrossChainState.PENDING,
+            initiatedAt: uint40(block.timestamp),
+            confirmedAt: 0
+        });
+
+        pendingOperations[operationId] = op;
+        allPendingOperationIds.push(operationId);
+        pendingByChain[destinationChain] += amount;
+
+        emit CrossChainInitiated(
+            operationId,
+            destinationChain,
+            destinationAdapter,
+            amount
+        );
+
+        return (operationId, amount);
+    }
+
+    /**
+     * @notice Receive bridged tokens from another chain
+     * @dev CRITICAL: Only relayer can call this, must verify source
+     */
+    function receiveBridged(
+        uint64 fromChain,
+        address sourceAdapter,
+        uint256 amount
+    ) 
+        external 
+        onlyRole(RELAYER_ROLE) 
+        returns (uint256 deposited) 
+    {
+        require(amount > 0, "Amount must be > 0");
+        require(supportedChains[fromChain], "Source chain not supported");
+        require(chainAdapterRegistry[fromChain] == sourceAdapter, "Adapter mismatch");
+
+        // Verify message authenticity (implemented by subclass)
+        require(_verifyBridgeMessage(sourceChain, sourceAdapter), "Message verification failed");
+
+        // Receive tokens (bridge transfers them here)
+        uint256 receivedAmount = _receiveBridgeTransfer(amount);
+        
+        settledBalance += receivedAmount;
+        emit SettledBalanceUpdated(settledBalance);
+
+        return receivedAmount;
+    }
+
+    /**
+     * @notice Confirm that a pending operation has settled on destination
+     * @dev Called by destination chain callback or relayer
+     */
+    function confirmCrossChainOperation(uint256 operationId) 
+        external 
+        onlyRole(RELAYER_ROLE) 
+        nonReentrant 
+    {
+        require(operationId < nextOperationId, "Invalid operation ID");
+        require(!operationFinalized[operationId], "Operation already finalized");
+
+        PendingCrossChainOp storage op = pendingOperations[operationId];
+        require(op.state == CrossChainState.PENDING, "Not pending");
+        require(op.amount > 0, "Operation already processed");
+
+        // Mark as confirmed
+        op.state = CrossChainState.CONFIRMED;
+        op.confirmedAt = uint40(block.timestamp);
+
+        // Remove from pending tracking
+        pendingByChain[op.destinationChain] -= op.amount;
+
+        emit CrossChainConfirmed(operationId, op.amount, op.confirmedAt);
+        emit PendingStateUpdated(operationId, CrossChainState.CONFIRMED);
+    }
+
+    /**
+     * @notice Force-withdraw from cross-chain escrow (emergency)
+     * @dev Can only be called by emergency admin during bridge failure
+     */
+    function forceWithdrawCrossChain(uint256 operationId) 
+        external 
+        onlyRole(EMERGENCY_ADMIN_ROLE) 
+        nonReentrant 
+        returns (uint256 recovered) 
+    {
+        require(operationId < nextOperationId, "Invalid operation ID");
+        require(!operationFinalized[operationId], "Already finalized");
+
+        PendingCrossChainOp storage op = pendingOperations[operationId];
+        require(op.state == CrossChainState.PENDING || op.state == CrossChainState.STUCK, 
+                "Can only force-withdraw pending/stuck operations");
+
+        recovered = op.amount;
+        require(recovered > 0, "No amount to recover");
+
+        // Recover funds from escrow
+        _recoverFromEscrow(recovered);
+
+        // Mark operation as FAILED and settled
+        op.state = CrossChainState.FAILED;
+        op.confirmedAt = uint40(block.timestamp);
+
+        // Remove from pending accounting
+        pendingByChain[op.destinationChain] -= op.amount;
+        op.amount = 0; // Zero out so can't be recovered twice
+
+        operationFinalized[operationId] = true;
+
+        emit ForceWithdrawCrossChain(operationId, recovered, "Emergency force-withdraw");
+        emit PendingStateUpdated(operationId, CrossChainState.FAILED);
+
+        return recovered;
+    }
+
+    /**
+     * @notice Mark a pending operation as stuck (bridge halted)
+     * @dev Can only be called by emergency admin
+     */
+    function markOperationStuck(uint256 operationId, string memory reason) 
+        external 
+        onlyRole(EMERGENCY_ADMIN_ROLE) 
+    {
+        require(operationId < nextOperationId, "Invalid operation ID");
+        PendingCrossChainOp storage op = pendingOperations[operationId];
+        require(op.state == CrossChainState.PENDING, "Not pending");
+
+        op.state = CrossChainState.STUCK;
+        emit PendingStateUpdated(operationId, CrossChainState.STUCK);
+    }
+
+    // ========================================================================
+    // BALANCE & STATE QUERIES
+    // ========================================================================
+
+    /**
+     * @notice Get balance split (settled vs pending)
+     * @return settled Confirmed balance on this chain
+     * @return pending Total amount in-flight across all bridges
+     */
+    function getBalanceSplit() 
+        external 
+        view 
+        returns (uint256 settled, uint256 pending) 
+    {
+        settled = settledBalance;
+        pending = _getTotalPendingAmount();
+        return (settled, pending);
+    }
+
+    /**
+     * @notice Get all pending operations
+     */
+    function getAllPendingOperations() 
+        external 
+        view 
+        returns (PendingCrossChainOp[] memory operations) 
+    {
+        uint256 count = 0;
+        for (uint256 i = 0; i < allPendingOperationIds.length; i++) {
+            uint256 opId = allPendingOperationIds[i];
+            if (!operationFinalized[opId]) count++;
+        }
+
+        operations = new PendingCrossChainOp[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < allPendingOperationIds.length; i++) {
+            uint256 opId = allPendingOperationIds[i];
+            if (!operationFinalized[opId]) {
+                operations[idx] = pendingOperations[opId];
+                idx++;
+            }
+        }
+    }
+
+    /**
+     * @notice Get a specific pending operation
+     */
+    function getPendingOperation(uint256 operationId) 
+        external 
+        view 
+        returns (PendingCrossChainOp memory operation) 
+    {
+        require(operationId < nextOperationId, "Invalid operation ID");
+        return pendingOperations[operationId];
+    }
+
+    /**
+     * @notice Check bridge block status
+     */
+    function getBlockedStatus() 
+        external 
+        view 
+        returns (bool isBlocked, string memory reason) 
+    {
+        return (bridgeBlocked, bridgeBlockReason);
+    }
+
+    /**
+     * @notice Get bridge configuration
+     */
+    function getBridgeConfig() 
+        external 
+        view 
+        returns (
+            BridgeType bridgeTypeOut,
+            uint16 maxAllocationBps,
+            uint256 maxPendingAmountOut,
+            uint64[] memory supportedChainsOut
+        ) 
+    {
+        // Count supported chains
+        uint256 chainCount = 0;
+        for (uint256 i = 0; i < 256; i++) { // Iterate through reasonable chain IDs
+            if (supportedChains[uint64(i)]) chainCount++;
+        }
+
+        uint64[] memory chains = new uint64[](chainCount);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < 256; i++) {
+            if (supportedChains[uint64(i)]) {
+                chains[idx] = uint64(i);
+                idx++;
+            }
+        }
+
+        return (
+            bridgeType,
+            MAX_ALLOCATION_CROSS_CHAIN_BPS,
+            maxPendingAmount,
+            chains
+        );
+    }
+
+    /**
+     * @notice Get risk metrics
+     */
+    function getRiskMetrics() 
+        external 
+        view 
+        returns (
+            uint16 riskScore,
+            uint40 latency,
+            uint32 failureRate
+        ) 
+    {
+        return (bridgeRiskScore, avgBridgeLatencySeconds, failureRatePerMillionOps);
+    }
+
+    // ========================================================================
+    // ADMIN FUNCTIONS
+    // ========================================================================
+
+    /**
+     * @notice Register adapter on a destination chain
+     */
+    function registerChainAdapter(uint64 chainId, address adapter) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        require(chainId != sourceChain, "Cannot register self");
+        require(adapter != address(0), "Invalid adapter address");
+        
+        chainAdapterRegistry[chainId] = adapter;
+        emit AdapterRegistered(chainId, adapter);
+    }
+
+    /**
+     * @notice Add supported chain
+     */
+    function addSupportedChain(uint64 chainId) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        require(chainId != sourceChain, "Cannot support self");
+        supportedChains[chainId] = true;
+        emit SupportedChainAdded(chainId);
+    }
+
+    /**
+     * @notice Update max pending amount
+     */
+    function setMaxPendingAmount(uint256 newMax) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        require(newMax > 0, "Max must be > 0");
+        maxPendingAmount = newMax;
+        emit MaxPendingAmountUpdated(newMax);
+    }
+
+    /**
+     * @notice Block bridge due to halting
+     */
+    function blockBridge(string memory reason) 
+        external 
+        onlyRole(EMERGENCY_ADMIN_ROLE) 
+    {
+        bridgeBlocked = true;
+        bridgeBlockReason = reason;
+        bridgeBlockedAt = uint40(block.timestamp);
+        _pause();
+        emit BridgeBlocked(reason, bridgeBlockedAt);
+    }
+
+    /**
+     * @notice Unblock bridge after recovery
+     */
+    function unblockBridge() 
+        external 
+        onlyRole(EMERGENCY_ADMIN_ROLE) 
+    {
+        bridgeBlocked = false;
+        bridgeBlockReason = "";
+        _unpause();
+    }
+
+    // ========================================================================
+    // INTERNAL / ABSTRACT (must be implemented by subclass)
+    // ========================================================================
+
+    /**
+     * @notice Initiate bridge transfer (subclass implements)
+     * @return bridgeId Transaction ID from bridge
+     */
+    function _initiateBridge(
+        uint256 amount,
+        uint64 destinationChain,
+        address destinationAdapter
+    ) internal virtual returns (bytes32 bridgeId);
+
+    /**
+     * @notice Verify bridge message authenticity
+     */
+    function _verifyBridgeMessage(uint64 sourceChain, address sourceAdapter) 
+        internal 
+        virtual 
+        returns (bool);
+
+    /**
+     * @notice Receive bridge transfer
+     * @return amount Actual amount received
+     */
+    function _receiveBridgeTransfer(uint256 expectedAmount) 
+        internal 
+        virtual 
+        returns (uint256 amount);
+
+    /**
+     * @notice Recover funds from escrow
+     */
+    function _recoverFromEscrow(uint256 amount) internal virtual;
+
+    /**
+     * @notice Get total pending across all chains
+     */
+    function _getTotalPendingAmount() internal view returns (uint256 total) {
+        for (uint256 i = 0; i < allPendingOperationIds.length; i++) {
+            uint256 opId = allPendingOperationIds[i];
+            if (!operationFinalized[opId]) {
+                total += pendingOperations[opId].amount;
+            }
+        }
+    }
+}

@@ -1,0 +1,320 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title LayerZeroAdapter
+ * @notice LayerZero-based cross-chain adapter for MALGIST
+ * @dev Demonstrates integration with LayerZero messaging protocol
+ *
+ * ARCHITECTURE:
+ * - LayerZero for message delivery (supports retry logic, re-org protection)
+ * - Escrow contract holds funds locally during bridge
+ * - Source chain initiates messages, destination executes
+ * - All state transitions are immutable and auditable
+ */
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./CrossChainAdapterBase.sol";
+
+// Minimal LayerZero interface (for demonstration)
+interface ILayerZeroEndpoint {
+    function send(
+        uint16 dstChainId,
+        bytes calldata destination,
+        bytes calldata payload,
+        address refundAddress,
+        address zroPaymentAddress,
+        bytes calldata adapterParams
+    ) external payable;
+
+    function estimateFees(
+        uint16 dstChainId,
+        address userApplication,
+        bytes calldata payload,
+        bool useZro,
+        bytes calldata adapterParams
+    ) external view returns (uint256 nativeFee, uint256 zroFee);
+}
+
+interface ILayerZeroReceiver {
+    function lzReceive(
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        uint64 _nonce,
+        bytes calldata _payload
+    ) external;
+}
+
+/**
+ * @notice Escrow contract holding funds during bridge operations
+ */
+contract CrossChainEscrow {
+    address public immutable owner;
+    address public immutable token;
+
+    mapping(address => uint256) public balances;
+
+    constructor(address _token) {
+        owner = msg.sender;
+        token = _token;
+    }
+
+    function lock(address account, uint256 amount) external {
+        require(msg.sender == owner, "Only owner");
+        IERC20(token).transferFrom(account, address(this), amount);
+        balances[account] += amount;
+    }
+
+    function unlock(address recipient, uint256 amount) external {
+        require(msg.sender == owner, "Only owner");
+        balances[owner] -= amount;
+        IERC20(token).transfer(recipient, amount);
+    }
+}
+
+contract LayerZeroAdapter is CrossChainAdapterBase, ILayerZeroReceiver {
+    using SafeERC20 for IERC20;
+
+    // ========================================================================
+    // LAYERZERO CONFIGURATION
+    // ========================================================================
+
+    // LayerZero chain IDs (mapping from MALGIST chain ID)
+    mapping(uint64 => uint16) public chainIdToLayerZeroChainId;
+    mapping(uint16 => uint64) public layerZeroChainIdToChainId;
+
+    ILayerZeroEndpoint public immutable lzEndpoint;
+    CrossChainEscrow public immutable escrow;
+
+    uint256 public lzGasLimit = 200000; // Default gas for destination execution
+
+    // Message tracking
+    mapping(bytes32 => uint256) public messageToOperationId; // LayerZero message hash → Operation ID
+    mapping(uint256 => bytes32) public operationToMessage;
+
+    // ========================================================================
+    // EVENTS
+    // ========================================================================
+
+    event LayerZeroMessageSent(
+        uint256 indexed operationId,
+        uint16 dstChainId,
+        bytes32 messageHash,
+        uint256 nativeFee
+    );
+
+    event LayerZeroMessageReceived(
+        uint16 indexed srcChainId,
+        uint64 nonce,
+        bytes32 messageHash,
+        uint256 amount
+    );
+
+    event EscrowLockedForBridge(
+        uint256 indexed operationId,
+        uint256 amount
+    );
+
+    event EscrowUnlockedAfterConfirmation(
+        uint256 indexed operationId,
+        uint256 amount
+    );
+
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
+
+    constructor(
+        address _baseToken,
+        uint64 _sourceChain,
+        address _lzEndpoint,
+        string memory _lzName
+    ) CrossChainAdapterBase(
+        _baseToken,
+        _sourceChain,
+        address(0), // Escrow set separately
+        BridgeType.LAYERZERO
+    ) {
+        require(_lzEndpoint != address(0), "Invalid LZ endpoint");
+
+        lzEndpoint = ILayerZeroEndpoint(_lzEndpoint);
+
+        // Deploy escrow contract
+        escrow = new CrossChainEscrow(_baseToken);
+
+        // Update base class escrow reference (via cast)
+        // Note: in production, use a setter or redesign escrow reference
+    }
+
+    /**
+     * @notice Register LayerZero chain mapping
+     */
+    function registerLayerZeroChain(
+        uint64 malgistChainId,
+        uint16 lzChainId,
+        address remoteAdapter
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(malgistChainId != sourceChain, "Cannot register self");
+        require(remoteAdapter != address(0), "Invalid adapter");
+
+        chainIdToLayerZeroChainId[malgistChainId] = lzChainId;
+        layerZeroChainIdToChainId[lzChainId] = malgistChainId;
+        // TODO: registerChainAdapter(malgistChainId, remoteAdapter);  // Requires CrossChainAdapterBase implementation
+
+        emit AdapterRegistered(malgistChainId, remoteAdapter);
+    }
+
+    // ========================================================================
+    // CROSS-CHAIN BRIDGE IMPLEMENTATION
+    // ========================================================================
+
+    /**
+     * @notice Initiate LayerZero bridge transfer
+     */
+    function _initiateBridge(
+        uint256 amount,
+        uint64 destinationChain,
+        address destinationAdapter
+    ) internal override returns (bytes32 bridgeId) {
+        require(amount <= MAX_SINGLE_BRIDGE_AMOUNT, "Amount exceeds bridge limit");
+
+        uint16 lzDstChain = chainIdToLayerZeroChainId[destinationChain];
+        require(lzDstChain != 0, "Chain not registered with LayerZero");
+
+        // Lock funds in escrow
+        baseToken.safeTransferFrom(msg.sender, address(escrow), amount);
+        // Note: In production, escrow.lock() would be called with proper state
+
+        // Encode message payload
+        bytes memory payload = abi.encode(
+            uint256(1), // Message type: BRIDGE_TRANSFER
+            amount,
+            msg.sender
+        );
+
+        // Estimate fees
+        (uint256 nativeFee, ) = lzEndpoint.estimateFees(
+            lzDstChain,
+            abi.encodePacked(destinationAdapter),
+            payload,
+            false,
+            bytes("")
+        );
+
+        require(msg.value >= nativeFee, "Insufficient native for LayerZero fee");
+
+        // Send message via LayerZero
+        lzEndpoint.send{value: nativeFee}(
+            lzDstChain,
+            abi.encodePacked(destinationAdapter),
+            payload,
+            payable(msg.sender),
+            address(0),
+            bytes("")
+        );
+
+        bridgeId = keccak256(abi.encodePacked(
+            block.timestamp,
+            msg.sender,
+            amount,
+            destinationChain
+        ));
+
+        emit LayerZeroMessageSent(0, lzDstChain, bridgeId, nativeFee);
+
+        return bridgeId;
+    }
+
+    /**
+     * @notice Verify LayerZero message authenticity
+     */
+    function _verifyBridgeMessage(uint64 sourceChain, address sourceAdapter) 
+        internal 
+        view 
+        override 
+        returns (bool) 
+    {
+        // In production: verify sender is registered adapter on source chain
+        return chainAdapterRegistry[sourceChain] == sourceAdapter;
+    }
+
+    /**
+     * @notice Receive bridged tokens via LayerZero
+     */
+    function _receiveBridgeTransfer(uint256 expectedAmount) 
+        internal 
+        override 
+        returns (uint256 amount) 
+    {
+        // In production: tokens already transferred by LayerZero
+        return expectedAmount;
+    }
+
+    /**
+     * @notice LayerZero receiver endpoint
+     * @dev Called by LayerZero protocol when message arrives
+     */
+    function lzReceive(
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        uint64 _nonce,
+        bytes calldata _payload
+    ) external override {
+        require(msg.sender == address(lzEndpoint), "Not LayerZero endpoint");
+
+        uint64 srcMalgistChain = layerZeroChainIdToChainId[_srcChainId];
+        require(srcMalgistChain != 0, "Unknown source chain");
+
+        // Decode payload
+        (uint256 messageType, uint256 amount, address recipient) = abi.decode(
+            _payload,
+            (uint256, uint256, address)
+        );
+
+        require(messageType == 1, "Unknown message type");
+        require(amount > 0, "Invalid amount");
+
+        // Generate message hash for tracking
+        bytes32 messageHash = keccak256(_payload);
+
+        // Track receipt
+        address srcAdapter = abi.decode(_srcAddress, (address));
+        require(chainAdapterRegistry[srcMalgistChain] == srcAdapter, "Adapter mismatch");
+
+        // Simulate receiving tokens (would be transferred by bridge)
+        // baseToken.transfer(recipient, amount);
+
+        settledBalance += amount;
+
+        emit LayerZeroMessageReceived(_srcChainId, _nonce, messageHash, amount);
+        emit SettledBalanceUpdated(settledBalance);
+    }
+
+    /**
+     * @notice Recover funds from escrow during emergency
+     */
+    function _recoverFromEscrow(uint256 amount) internal override {
+        // In production: call escrow.unlock()
+        // escrow.unlock(address(this), amount);
+    }
+
+    // ========================================================================
+    // UTILITIES
+    // ========================================================================
+
+    /**
+     * @notice Update LayerZero gas limit
+     */
+    function setLzGasLimit(uint256 newLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newLimit > 0, "Gas limit must be > 0");
+        lzGasLimit = newLimit;
+    }
+
+    /**
+     * @notice Check if a chain is registered with LayerZero
+     */
+    function isChainRegistered(uint64 chainId) external view returns (bool) {
+        return chainIdToLayerZeroChainId[chainId] != 0;
+    }
+}

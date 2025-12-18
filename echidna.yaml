@@ -1,0 +1,13 @@
+testLimit: 50000
+timeout: 120
+workers: 4
+corpusDir: "./corpus"
+seed: 2025
+coverage: true
+gas: true
+```solidity
+// Echidna Configuration for MALGIST Phase 3 Testing
+// This config enables fuzzing of UniversalVault invariants
+// Total: 50,000 transaction sequences
+// Coverage: Track all code paths
+// Timeout: 120 seconds per property

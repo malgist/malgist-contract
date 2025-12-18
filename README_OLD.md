@@ -9,6 +9,30 @@
 
 ---
 
+## ⚡ Quick Start (Choose Your Path)
+
+### 🔴 **For Judges** — Start here (5-10 min)
+
+👉 **Read:** [`JUDGE_START_HERE.md`](JUDGE_START_HERE.md) — Step-by-step judge guide  
+→ Then: [`Documentation/README_NEW_STRUCTURE.md`](Documentation/README_NEW_STRUCTURE.md) — Navigation hub
+
+### 🟢 **For Auditors** — Security focus (20-45 min)
+
+👉 **Read:** [`Documentation/2_AUDIT_EVIDENCE/AUDIT_COMPLETE_SUMMARY.md`](Documentation/AUDIT_COMPLETE_SUMMARY.md)  
+→ Then: Individual audit phase reports in `/Documentation/`
+
+### 🔵 **For Engineers** — Technical deep dive (1-2 hours)
+
+👉 **Read:** [`Documentation/3_TECHNICAL_DEEP_DIVE/ARCHITECTURE/`](Documentation/MALGIST_COMPLETE_ARCHITECTURE.md)  
+→ Then: Implementation guides & API reference
+
+### 📊 **For Managers** — Project overview (15 min)
+
+👉 **Read:** [`Documentation/DELIVERABLES_CHECKLIST.md`](Documentation/DELIVERABLES_CHECKLIST.md)  
+→ See: Phase completion tracker & metrics
+
+---
+
 ## 🎯 One-Liner
 
 MALGIST is a **non-custodial, multi-protocol DeFi vault** that routes user deposits through unlimited adapters (Lendle, FusionX, etc.), executes creator-designed strategies as immutable NFTs, leverages AI for optimization without new trust assumptions, and maintains full ERC-4626 compatibility — all on Mantle's ultra-cheap L2 infrastructure.
