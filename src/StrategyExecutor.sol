@@ -108,7 +108,7 @@ contract StrategyExecutor is ReentrancyGuard {
     error UnauthorizedCaller();
     error InvalidArrayLength();
     error InvalidRatios();
-    error AdapterCallFailed();
+    error AdapterCallFailed_Error();
     error ZeroSharesReturned();
     error InvalidAmount();
 
@@ -204,7 +204,7 @@ contract StrategyExecutor is ReentrancyGuard {
             }
 
             // Validate result
-            if (!results[i].success) revert AdapterCallFailed();
+            if (!results[i].success) revert AdapterCallFailed_Error();
             if (results[i].shares == 0) revert ZeroSharesReturned();
 
             emit DepositExecuted(
@@ -276,10 +276,10 @@ contract StrategyExecutor is ReentrancyGuard {
             if (!results[i].success) {
                 emit AdapterCallFailed(
                     params.adapters[i],
-                    params.callData.length > i ? params.callData[i] : "",
+                    params.callData.length > i ? params.callData[i] : bytes(""),
                     results[i].returnData
                 );
-                revert AdapterCallFailed();
+                revert AdapterCallFailed_Error();
             }
 
             totalWithdrawn += results[i].shares;

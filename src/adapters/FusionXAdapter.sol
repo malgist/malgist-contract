@@ -87,6 +87,9 @@ contract FusionXAdapter is IAdapter, Ownable {
     /// @notice Basis points constant
     uint16 public constant TOTAL_BPS = 10000;
 
+    /// @notice Default slippage protection (0.5%)
+    uint16 public constant DEFAULT_SLIPPAGE_BPS = 50;
+
     /// @notice Emitted when liquidity is added
     event LiquidityAdded(uint256 amountA, uint256 amountB, uint256 liquidity);
 
@@ -311,8 +314,8 @@ contract FusionXAdapter is IAdapter, Ownable {
      */
     function _addLiquidity(uint256 amountA, uint256 amountB) internal returns (uint256 liquidity) {
         // Calculate minimum amounts with slippage
-        uint256 amountAMin = (amountA * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
-        uint256 amountBMin = (amountB * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
+        uint256 amountAMin = (amountA * (TOTAL_BPS - DEFAULT_SLIPPAGE_BPS)) / TOTAL_BPS;
+        uint256 amountBMin = (amountB * (TOTAL_BPS - DEFAULT_SLIPPAGE_BPS)) / TOTAL_BPS;
 
         // Approve router for both tokens
         TOKEN_A.forceApprove(address(ROUTER), amountA);

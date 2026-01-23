@@ -81,8 +81,9 @@ contract DeployUserVault is Script {
         lendleAdapter = new LendleAdapter(address(usdc), address(lendingPool), address(vault));
         console.log("  LendleAdapter:", address(lendleAdapter));
 
+        // For FusionXAdapter, priceOracle can be address(0) for now (optional), owner is deployer
         fusionXAdapter =
-            new FusionXAdapter(address(usdc), address(wmnt), address(lpToken), address(dexRouter), address(vault));
+            new FusionXAdapter(address(usdc), address(wmnt), address(lpToken), address(dexRouter), address(vault), address(0), msg.sender);
         console.log("  FusionXAdapter:", address(fusionXAdapter));
         console.log("");
 

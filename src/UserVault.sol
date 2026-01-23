@@ -94,6 +94,29 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     /// @notice Adapter address => cached reported balance (in base units)
     mapping(address => uint256) public adapterCached;
 
+    // ============ FEE DISTRIBUTION TRACKING (Aspect #6) ============
+
+    /**
+     * @notice Fee breakdown per adapter for detailed analytics
+     * @param adapter Adapter address that generated fees
+     * @param amount Fee amount from this adapter
+     * @param timestamp When fee was collected
+     */
+    struct AdapterFeeEntry {
+        address adapter;
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+    /// @notice Creator address => array of fee entries per adapter
+    mapping(address => AdapterFeeEntry[]) public adapterFeeHistory;
+
+    /// @notice Creator address => adapter address => accumulated fees
+    mapping(address => mapping(address => uint256)) public feesByAdapter;
+
+    /// @notice Total number of fee collection events per creator
+    mapping(address => uint256) public totalFeeEvents;
+
     /// @notice Minimum seconds between rebalances per strategy
     uint256 public minRebalanceInterval = 3600; // default 1 hour
 
@@ -134,6 +157,23 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     event StrategyUpdated(address indexed user, bool isPublic, string name, uint16 copyFeeBps);
 
     event CopyFeesClaimed(address indexed user, uint256 amount);
+
+    /// @notice Emitted when copy fees are collected with adapter breakdown (Aspect #6)
+    event CopyFeeCollectedDetailed(
+        address indexed creator,
+        address indexed copier,
+        uint256 totalFee,
+        address[] adapters,
+        uint256[] feesByAdapter
+    );
+
+    /// @notice Emitted when fees are claimed with detailed breakdown (Aspect #6)
+    event CopyFeesClaimedDetailed(
+        address indexed creator,
+        uint256 totalAmount,
+        uint256 adapterCount,
+        uint256[] adapterFees
+    );
 
     /// @notice Emitted when vault shares are minted
     event SharesMinted(address indexed user, uint256 indexed strategyId, uint256 shares, uint256 amount);
@@ -429,7 +469,7 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         // Transfer assets from user
         ASSET.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Pay copy fee if this is a copied strategy
+        // Pay copy fee if this is a copied strategy (ENHANCED: Per-adapter fee tracking)
         uint256 netAmount = amount;
         address originalCreator = copiedFrom[msg.sender];
         if (originalCreator != address(0)) {
@@ -440,6 +480,9 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
 
                 // Accumulate fee for original creator
                 copyFeeEarnings[originalCreator] += copyFee;
+
+                // ENHANCEMENT (Aspect #6): Track per-adapter fee distribution
+                _recordAdapterFees(originalCreator, copyFee, creatorStrategy.adapters, creatorStrategy.ratios);
 
                 // Update creator's TVL stats
                 strategies[originalCreator].totalCopierTVL += netAmount;
@@ -552,16 +595,193 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     }
 
     /**
-     * @notice Claim accumulated copy fee earnings
+     * @notice Claim accumulated copy fee earnings (ENHANCED: Detailed breakdown)
+     * @return claimed Total amount of fees claimed
+     * @dev Emits detailed breakdown of fees by adapter for analytics
      */
-    function claimCopyFees() external nonReentrant {
+    function claimCopyFees() external nonReentrant returns (uint256 claimed) {
         uint256 earnings = copyFeeEarnings[msg.sender];
         if (earnings == 0) revert InvalidAmount();
 
+        // Get strategy adapters for detailed breakdown
+        Strategy storage s = strategies[msg.sender];
+        uint256 adaptersLen = s.adapters.length;
+
+        // Collect per-adapter fees for detailed event
+        uint256[] memory adapterFees = new uint256[](adaptersLen);
+        for (uint256 i = 0; i < adaptersLen; i++) {
+            adapterFees[i] = feesByAdapter[msg.sender][s.adapters[i]];
+            // Reset per-adapter fees after claiming
+            feesByAdapter[msg.sender][s.adapters[i]] = 0;
+        }
+
+        // Reset total earnings
         copyFeeEarnings[msg.sender] = 0;
+
+        // Transfer fees to creator
         ASSET.safeTransfer(msg.sender, earnings);
 
+        // Emit legacy event for backward compatibility
         emit CopyFeesClaimed(msg.sender, earnings);
+
+        // Emit detailed event with adapter breakdown (Aspect #6)
+        emit CopyFeesClaimedDetailed(msg.sender, earnings, adaptersLen, adapterFees);
+
+        return earnings;
+    }
+
+    // ========================================================================
+    // FEE CLAIM & VIEW FUNCTIONS (Aspect #6 Enhancement)
+    // ========================================================================
+
+    /**
+     * @notice Get fee breakdown by adapter for a creator
+     * @param creator Strategy creator address
+     * @return adapters Array of adapter addresses
+     * @return fees Array of fees earned from each adapter
+     */
+    function getFeeBreakdown(address creator)
+        external
+        view
+        returns (address[] memory adapters, uint256[] memory fees)
+    {
+        Strategy storage s = strategies[creator];
+        uint256 adaptersLen = s.adapters.length;
+
+        adapters = new address[](adaptersLen);
+        fees = new uint256[](adaptersLen);
+
+        for (uint256 i = 0; i < adaptersLen; i++) {
+            adapters[i] = s.adapters[i];
+            fees[i] = feesByAdapter[creator][s.adapters[i]];
+        }
+
+        return (adapters, fees);
+    }
+
+    /**
+     * @notice Get fee history for a creator (paginated)
+     * @param creator Strategy creator address
+     * @param offset Starting index
+     * @param limit Maximum number of entries to return
+     * @return entries Array of adapter fee entries
+     */
+    function getFeeHistory(address creator, uint256 offset, uint256 limit)
+        external
+        view
+        returns (AdapterFeeEntry[] memory entries)
+    {
+        AdapterFeeEntry[] storage history = adapterFeeHistory[creator];
+        uint256 totalEntries = history.length;
+
+        if (offset >= totalEntries) {
+            return new AdapterFeeEntry[](0);
+        }
+
+        uint256 end = offset + limit;
+        if (end > totalEntries) {
+            end = totalEntries;
+        }
+
+        uint256 resultLen = end - offset;
+        entries = new AdapterFeeEntry[](resultLen);
+
+        for (uint256 i = 0; i < resultLen; i++) {
+            entries[i] = history[offset + i];
+        }
+
+        return entries;
+    }
+
+    /**
+     * @notice Get total fee earnings summary for a creator
+     * @param creator Strategy creator address
+     * @return totalEarned Total fees earned all-time
+     * @return pending Current pending fees
+     * @return totalEvents Number of fee collection events
+     */
+    function getFeeSummary(address creator)
+        external
+        view
+        returns (
+            uint256 totalEarned,
+            uint256 pending,
+            uint256 totalEvents
+        )
+    {
+        totalEarned = copyFeeEarnings[creator]; // Current pending (not yet claimed)
+        pending = copyFeeEarnings[creator];
+        totalEvents = totalFeeEvents[creator];
+
+        return (totalEarned, pending, totalEvents);
+    }
+
+    /**
+     * @notice Get fee earned from a specific adapter
+     * @param creator Strategy creator address
+     * @param adapter Adapter address
+     * @return feeAmount Fee amount from this adapter
+     */
+    function getFeeByAdapter(address creator, address adapter)
+        external
+        view
+        returns (uint256 feeAmount)
+    {
+        return feesByAdapter[creator][adapter];
+    }
+
+    /**
+     * @notice Get total number of fee history entries
+     * @param creator Strategy creator address
+     * @return count Total number of entries
+     */
+    function getFeeHistoryCount(address creator)
+        external
+        view
+        returns (uint256 count)
+    {
+        return adapterFeeHistory[creator].length;
+    }
+
+    /**
+     * @notice Batch claim fees for multiple creators (admin/aggregator function)
+     * @param creators Array of creator addresses to claim for
+     * @return totalClaimed Total amount claimed across all creators
+     * @dev Useful for aggregator contracts or mass payouts
+     * @dev Each creator must have approved this contract to claim on their behalf
+     */
+    function batchClaimFeesFor(address[] calldata creators)
+        external
+        nonReentrant
+        returns (uint256 totalClaimed)
+    {
+        for (uint256 i = 0; i < creators.length; i++) {
+            address creator = creators[i];
+            uint256 earnings = copyFeeEarnings[creator];
+
+            if (earnings == 0) continue;
+
+            // Get strategy adapters for detailed breakdown
+            Strategy storage s = strategies[creator];
+            uint256 adaptersLen = s.adapters.length;
+
+            // Reset per-adapter fees
+            for (uint256 j = 0; j < adaptersLen; j++) {
+                feesByAdapter[creator][s.adapters[j]] = 0;
+            }
+
+            // Reset total earnings
+            copyFeeEarnings[creator] = 0;
+
+            // Transfer fees to creator
+            ASSET.safeTransfer(creator, earnings);
+
+            totalClaimed += earnings;
+
+            emit CopyFeesClaimed(creator, earnings);
+        }
+
+        return totalClaimed;
     }
 
     /**
@@ -1141,5 +1361,63 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
 
     function _strategyIdForUser(address user) internal pure returns (uint256) {
         return uint256(uint160(user));
+    }
+
+    // ========================================================================
+    // INTERNAL FUNCTIONS - FEE DISTRIBUTION (Aspect #6)
+    // ========================================================================
+
+    /**
+     * @notice Record per-adapter fee distribution for detailed tracking
+     * @param creator Strategy creator receiving fees
+     * @param totalFee Total copy fee collected
+     * @param adapters Array of adapters in the strategy
+     * @param ratios Allocation ratios for each adapter
+     * @dev Distributes fee proportionally across adapters based on their allocation ratio
+     */
+    function _recordAdapterFees(
+        address creator,
+        uint256 totalFee,
+        address[] memory adapters,
+        uint16[] memory ratios
+    ) internal {
+        uint256 adaptersLen = adapters.length;
+        uint256[] memory adapterFees = new uint256[](adaptersLen);
+
+        uint256 distributedFee = 0;
+
+        // Distribute fee proportionally across adapters
+        for (uint256 i = 0; i < adaptersLen;) {
+            uint256 adapterFee;
+
+            // Last adapter gets remaining fee to handle rounding
+            if (i == adaptersLen - 1) {
+                adapterFee = totalFee - distributedFee;
+            } else {
+                adapterFee = (totalFee * ratios[i]) / TOTAL_BPS;
+                distributedFee += adapterFee;
+            }
+
+            // Track fee by adapter
+            feesByAdapter[creator][adapters[i]] += adapterFee;
+            adapterFees[i] = adapterFee;
+
+            // Record in fee history
+            adapterFeeHistory[creator].push(
+                AdapterFeeEntry({
+                    adapter: adapters[i],
+                    amount: adapterFee,
+                    timestamp: block.timestamp
+                })
+            );
+
+            unchecked { ++i; }
+        }
+
+        // Increment total fee events counter
+        totalFeeEvents[creator]++;
+
+        // Emit detailed fee collection event
+        emit CopyFeeCollectedDetailed(creator, msg.sender, totalFee, adapters, adapterFees);
     }
 }

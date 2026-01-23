@@ -172,7 +172,7 @@ contract AdapterGovernance is Ownable, ReentrancyGuard {
     error AdapterAlreadyStaged();
     error AdapterNotStaged();
     error TimelockNotExpired();
-    error AdapterBlacklisted();
+    error AdapterIsBlacklisted();
     error InvalidPhaseTransition();
     error InvalidTimelock();
     error UpgradeNotReady();
@@ -228,7 +228,7 @@ contract AdapterGovernance is Ownable, ReentrancyGuard {
         // Cannot stage if already staged, approved, or blacklisted
         if (currentPhase == AdapterPhase.Staged) revert AdapterAlreadyStaged();
         if (currentPhase == AdapterPhase.Approved) revert InvalidPhaseTransition();
-        if (currentPhase == AdapterPhase.Blacklisted) revert AdapterBlacklisted();
+        if (currentPhase == AdapterPhase.Blacklisted) revert AdapterIsBlacklisted();
 
         // Check identifier is not already taken by another adapter
         address existingAdapter = identifierToAdapter[identifier];
@@ -306,7 +306,7 @@ contract AdapterGovernance is Ownable, ReentrancyGuard {
         AdapterPhase currentPhase = adapterPhase[adapter];
 
         // Cannot blacklist if already blacklisted
-        if (currentPhase == AdapterPhase.Blacklisted) revert AdapterBlacklisted();
+        if (currentPhase == AdapterPhase.Blacklisted) revert AdapterIsBlacklisted();
 
         // Update phase
         adapterPhase[adapter] = AdapterPhase.Blacklisted;

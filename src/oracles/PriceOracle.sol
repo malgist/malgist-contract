@@ -5,6 +5,26 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 
 /**
+ * @title Chainlink Aggregator V3 Interface
+ * @notice Standard Chainlink price feed interface
+ */
+interface IAggregatorV3 {
+    function decimals() external view returns (uint8);
+    function description() external view returns (string memory);
+    function version() external view returns (uint256);
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+}
+
+/**
  * @title PriceOracle
  * @notice Aggregated price oracle with Chainlink integration and fallback mechanisms
  * @dev Provides reliable price feeds with staleness checks and circuit breakers
@@ -25,27 +45,8 @@ import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 contract PriceOracle is IPriceOracle, Ownable {
 
     // ============================================================================
-    // INTERFACES
+    // TYPE DEFINITIONS
     // ============================================================================
-
-    /**
-     * @notice Chainlink Aggregator V3 Interface
-     */
-    interface AggregatorV3Interface {
-        function decimals() external view returns (uint8);
-        function description() external view returns (string memory);
-        function version() external view returns (uint256);
-        function latestRoundData()
-            external
-            view
-            returns (
-                uint80 roundId,
-                int256 answer,
-                uint256 startedAt,
-                uint256 updatedAt,
-                uint80 answeredInRound
-            );
-    }
 
     // ============================================================================
     // STRUCTS
@@ -186,7 +187,7 @@ contract PriceOracle is IPriceOracle, Ownable {
         require(maxDeviation <= BPS, "Invalid deviation");
 
         // Verify feed is valid by calling it
-        AggregatorV3Interface aggregator = AggregatorV3Interface(feed);
+        IAggregatorV3 aggregator = IAggregatorV3(feed);
         uint8 decimals = aggregator.decimals();
 
         priceFeeds[asset] = PriceFeed({
@@ -217,7 +218,7 @@ contract PriceOracle is IPriceOracle, Ownable {
         require(priceFeeds[asset].isActive, "Feed not active");
         require(newFeed != address(0), "Invalid feed");
 
-        AggregatorV3Interface aggregator = AggregatorV3Interface(newFeed);
+        IAggregatorV3 aggregator = IAggregatorV3(newFeed);
         uint8 decimals = aggregator.decimals();
 
         priceFeeds[asset].feed = newFeed;
@@ -379,7 +380,7 @@ contract PriceOracle is IPriceOracle, Ownable {
         view
         returns (uint256 price)
     {
-        AggregatorV3Interface aggregator = AggregatorV3Interface(feed.feed);
+        IAggregatorV3 aggregator = IAggregatorV3(feed.feed);
 
         (
             uint80 roundId,
@@ -416,7 +417,7 @@ contract PriceOracle is IPriceOracle, Ownable {
         view
         returns (uint256 price, bool isStale)
     {
-        try AggregatorV3Interface(feed.feed).latestRoundData() returns (
+        try IAggregatorV3(feed.feed).latestRoundData() returns (
             uint80 roundId,
             int256 answer,
             uint256,
