@@ -24,8 +24,12 @@ contract DeployStrategyExecutor is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
+        // Get existing deployed addresses from environment
+        address vault = vm.envAddress("USER_VAULT_ADDRESS");
+        address asset = vm.envAddress("USDC_ADDRESS");
+
         // Deploy StrategyExecutor contract
-        StrategyExecutor executor = new StrategyExecutor(deployer);
+        StrategyExecutor executor = new StrategyExecutor(vault, asset);
         
         console.log("StrategyExecutor deployed at:", address(executor));
 

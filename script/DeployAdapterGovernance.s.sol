@@ -24,14 +24,10 @@ contract DeployAdapterGovernance is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy AdapterGovernance contract (with 2-day timelock)
-        // 2 days = 172,800 seconds
-        uint48 timelockDuration = 2 days;
-        
-        AdapterGovernance governance = new AdapterGovernance(deployer, timelockDuration, deployer);
+        // Deploy AdapterGovernance contract (emergency guardian is deployer)
+        AdapterGovernance governance = new AdapterGovernance(deployer);
         
         console.log("AdapterGovernance deployed at:", address(governance));
-        console.log("Timelock duration:", timelockDuration, "seconds (2 days)");
 
         vm.stopBroadcast();
 
@@ -41,7 +37,9 @@ contract DeployAdapterGovernance is Script {
         console.log("DEPLOYMENT COMPLETE");
         console.log("========================================");
         console.log("AdapterGovernance:", address(governance));
-        console.log("Timelock duration: 2 days");
+        console.log("");
+        console.log("IMPORTANT: 2-day timelock delay for adapter approvals");
+        console.log("Default emergency guardian:", deployer);
         console.log("");
     }
 }
