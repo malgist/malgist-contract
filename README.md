@@ -433,20 +433,20 @@ forge script script/DeployUserVault.s.sol \
 
 ### For Specific Questions
 
-**"How does zero-trust AI work?"**
-→ `Documentation/AI_STRATEGY_SCHEMA_SPEC.md` (Section: "Design Philosophy")
-
-**"How do I create a strategy?"**
-→ `Documentation/AI_STRATEGY_IMPLEMENTATION_GUIDE.md` (Section: "Strategy Creation Flow")
-
-**"What's the NFT model?"**
-→ `Documentation/STRATEGY_NFT_ENHANCEMENTS.md` - NEW
-
-**"How are adapters protected?"**
-→ `Documentation/ADAPTER_WHITELIST_GOVERNANCE.md` - NEW
-
-**"How does slippage protection work?"**
-→ `Documentation/PRICE_ORACLE_AND_SLIPPAGE_PROTECTION.md` - NEW
+| Question | Documentation Link |
+|----------|-------------------|
+| **How does the vault handle multiple protocols?** | [PHASE2_MODULAR_ADAPTER_SYSTEM.md](Documentation/PHASE2_MODULAR_ADAPTER_SYSTEM.md) |
+| **What makes the strategy system unique?** | [PHASE3_STRATEGY_AS_NFT_DESIGN.md](Documentation/PHASE3_STRATEGY_AS_NFT_DESIGN.md) |
+| **How is AI integrated without creating new trust?** | [PHASE4_AI_ASSISTED_STRATEGIES_DESIGN.md](Documentation/PHASE4_AI_ASSISTED_STRATEGIES_DESIGN.md) |
+| **What's the ERC-4626 implementation?** | [PHASE5_ERC4626_COMPATIBILITY_DESIGN.md](Documentation/PHASE5_ERC4626_COMPATIBILITY_DESIGN.md) |
+| **How do I use the faucet?** | [FAUCET_SETUP_GUIDE.md](Documentation/FAUCET_SETUP_GUIDE.md) |
+| **How does zero-trust AI work?** | [AI_STRATEGY_SCHEMA_SPEC.md](Documentation/AI_STRATEGY_SCHEMA_SPEC.md) - Section: "Design Philosophy" |
+| **How do I create a strategy?** | [AI_STRATEGY_IMPLEMENTATION_GUIDE.md](Documentation/AI_STRATEGY_IMPLEMENTATION_GUIDE.md) - Section: "Strategy Creation Flow" |
+| **What's the NFT model?** | [STRATEGY_NFT_ENHANCEMENTS.md](Documentation/STRATEGY_NFT_ENHANCEMENTS.md) |
+| **How are adapters protected?** | [ADAPTER_WHITELIST_GOVERNANCE.md](Documentation/ADAPTER_WHITELIST_GOVERNANCE.md) |
+| **How does slippage protection work?** | [PRICE_ORACLE_AND_SLIPPAGE_PROTECTION.md](Documentation/PRICE_ORACLE_AND_SLIPPAGE_PROTECTION.md) |
+| **What's the complete architecture?** | [ARCHITECTURE_DESIGN.md](Documentation/ARCHITECTURE_DESIGN.md) |
+| **Security audit findings?** | [AUDIT_MASTER_INDEX.md](Documentation/AUDIT_MASTER_INDEX.md) |
 
 ---
 
