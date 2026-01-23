@@ -3,7 +3,10 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAdapter} from "../interfaces/IAdapter.sol";
+import {SlippageProtection} from "../libraries/SlippageProtection.sol";
+import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 
 /**
  * @title IUniswapV2Router
@@ -44,14 +47,20 @@ interface IUniswapV2Router {
 
 /**
  * @title FusionXAdapter
- * @notice Zap adapter for FusionX DEX on Mantle Network
+ * @notice Zap adapter for FusionX DEX on Mantle Network with dynamic slippage protection
  * @dev Takes single-sided deposits (USDC) and provides liquidity to USDC/MNT pair
  *
  * Flow:
  * - Deposit: USDC → 50% swap to MNT → Add liquidity → Hold LP tokens
  * - Withdraw: Remove liquidity → Swap MNT to USDC → Return total USDC
+ *
+ * ENHANCEMENTS (Aspect #5):
+ * ✅ Dynamic slippage based on trade size (no more hardcoded 0.5%)
+ * ✅ Price oracle integration for expected output validation
+ * ✅ MEV protection through trade-size-scaled slippage
+ * ✅ Configurable slippage tiers (conservative/moderate/aggressive)
  */
-contract FusionXAdapter is IAdapter {
+contract FusionXAdapter is IAdapter, Ownable {
     using SafeERC20 for IERC20;
 
     /// @notice The base token for deposits/withdrawals (e.g., USDC)
@@ -69,8 +78,11 @@ contract FusionXAdapter is IAdapter {
     /// @notice The vault address that owns this adapter
     address public immutable VAULT;
 
-    /// @notice Slippage tolerance in basis points (e.g., 50 = 0.5%)
-    uint16 public constant SLIPPAGE_BPS = 50;
+    /// @notice Price oracle for dynamic slippage calculation
+    IPriceOracle public priceOracle;
+
+    /// @notice Slippage configuration (dynamic based on trade size)
+    SlippageProtection.SlippageConfig public slippageConfig;
 
     /// @notice Basis points constant
     uint16 public constant TOTAL_BPS = 10000;
@@ -84,10 +96,17 @@ contract FusionXAdapter is IAdapter {
     /// @notice Emitted when tokens are swapped
     event TokensSwapped(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
+    /// @notice Emitted when price oracle is updated
+    event PriceOracleUpdated(address indexed oldOracle, address indexed newOracle);
+
+    /// @notice Emitted when slippage config is updated
+    event SlippageConfigUpdated(uint16 smallTradeBps, uint16 mediumTradeBps, uint16 largeTradeBps, uint16 whaleTradeBps);
+
     /// @dev Errors
     error OnlyVault();
     error InvalidAmount();
     error SlippageExceeded();
+    error InvalidOracleAddress();
 
     modifier onlyVault() {
         if (msg.sender != VAULT) revert OnlyVault();
@@ -101,13 +120,27 @@ contract FusionXAdapter is IAdapter {
      * @param lpToken The LP token address
      * @param router The Uniswap V2 router address
      * @param vault The UniversalVault address
+     * @param _priceOracle Price oracle for dynamic slippage
+     * @param owner Owner address for admin functions
      */
-    constructor(address tokenA, address tokenB, address lpToken, address router, address vault) {
+    constructor(
+        address tokenA,
+        address tokenB,
+        address lpToken,
+        address router,
+        address vault,
+        address _priceOracle,
+        address owner
+    ) Ownable(owner) {
         TOKEN_A = IERC20(tokenA);
         TOKEN_B = IERC20(tokenB);
         LP_TOKEN = IERC20(lpToken);
         ROUTER = IUniswapV2Router(router);
         VAULT = vault;
+        priceOracle = IPriceOracle(_priceOracle);
+
+        // Initialize with moderate slippage config by default
+        slippageConfig = SlippageProtection.getModerateConfig();
     }
 
     /**
@@ -181,7 +214,7 @@ contract FusionXAdapter is IAdapter {
     }
 
     /**
-     * @notice Internal function to swap tokenA for tokenB
+     * @notice Internal function to swap tokenA for tokenB with dynamic slippage
      * @param amountIn Amount of tokenA to swap
      * @return amountOut Amount of tokenB received
      */
@@ -190,9 +223,19 @@ contract FusionXAdapter is IAdapter {
         path[0] = address(TOKEN_A);
         path[1] = address(TOKEN_B);
 
-        // Calculate minimum output with slippage
-        uint256[] memory amountsOut = ROUTER.getAmountsOut(amountIn, path);
-        uint256 minAmountOut = (amountsOut[1] * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
+        // ENHANCEMENT: Use dynamic slippage based on trade size and oracle price
+        SlippageProtection.SwapParams memory params = SlippageProtection.SwapParams({
+            tokenIn: address(TOKEN_A),
+            tokenOut: address(TOKEN_B),
+            amountIn: amountIn,
+            priceOracle: address(priceOracle),
+            config: slippageConfig
+        });
+
+        SlippageProtection.SlippageResult memory result = SlippageProtection.calculateSlippage(params);
+
+        // Use oracle-based minimum output (more accurate than DEX quotes)
+        uint256 minAmountOut = result.minOutput;
 
         // Approve router
         TOKEN_A.forceApprove(address(ROUTER), amountIn);
@@ -203,6 +246,9 @@ contract FusionXAdapter is IAdapter {
 
         amountOut = amounts[1];
 
+        // Validate output against oracle expectation
+        SlippageProtection.validateOutput(amountOut, minAmountOut);
+
         // Reset approval
         TOKEN_A.forceApprove(address(ROUTER), 0);
 
@@ -212,7 +258,7 @@ contract FusionXAdapter is IAdapter {
     }
 
     /**
-     * @notice Internal function to swap tokenB for tokenA
+     * @notice Internal function to swap tokenB for tokenA with dynamic slippage
      * @param amountIn Amount of tokenB to swap
      * @return amountOut Amount of tokenA received
      */
@@ -223,9 +269,19 @@ contract FusionXAdapter is IAdapter {
         path[0] = address(TOKEN_B);
         path[1] = address(TOKEN_A);
 
-        // Calculate minimum output with slippage
-        uint256[] memory amountsOut = ROUTER.getAmountsOut(amountIn, path);
-        uint256 minAmountOut = (amountsOut[1] * (TOTAL_BPS - SLIPPAGE_BPS)) / TOTAL_BPS;
+        // ENHANCEMENT: Use dynamic slippage based on trade size and oracle price
+        SlippageProtection.SwapParams memory params = SlippageProtection.SwapParams({
+            tokenIn: address(TOKEN_B),
+            tokenOut: address(TOKEN_A),
+            amountIn: amountIn,
+            priceOracle: address(priceOracle),
+            config: slippageConfig
+        });
+
+        SlippageProtection.SlippageResult memory result = SlippageProtection.calculateSlippage(params);
+
+        // Use oracle-based minimum output (more accurate than DEX quotes)
+        uint256 minAmountOut = result.minOutput;
 
         // Approve router
         TOKEN_B.forceApprove(address(ROUTER), amountIn);
@@ -235,6 +291,9 @@ contract FusionXAdapter is IAdapter {
             ROUTER.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp);
 
         amountOut = amounts[1];
+
+        // Validate output against oracle expectation
+        SlippageProtection.validateOutput(amountOut, minAmountOut);
 
         // Reset approval
         TOKEN_B.forceApprove(address(ROUTER), 0);
@@ -324,5 +383,122 @@ contract FusionXAdapter is IAdapter {
      */
     function getRouter() external view returns (address) {
         return address(ROUTER);
+    }
+
+    // ========================================================================
+    // ADMIN FUNCTIONS (Aspect #5 Enhancement)
+    // ========================================================================
+
+    /**
+     * @notice Update price oracle address
+     * @param newOracle New price oracle address
+     * @dev Only owner can update
+     */
+    function setPriceOracle(address newOracle) external onlyOwner {
+        if (newOracle == address(0)) revert InvalidOracleAddress();
+
+        address oldOracle = address(priceOracle);
+        priceOracle = IPriceOracle(newOracle);
+
+        emit PriceOracleUpdated(oldOracle, newOracle);
+    }
+
+    /**
+     * @notice Update slippage configuration
+     * @param newConfig New slippage configuration
+     * @dev Only owner can update. Config must pass validation.
+     */
+    function setSlippageConfig(SlippageProtection.SlippageConfig calldata newConfig) external onlyOwner {
+        require(SlippageProtection.isValidConfig(newConfig), "Invalid slippage config");
+
+        slippageConfig = newConfig;
+
+        emit SlippageConfigUpdated(
+            newConfig.smallTradeBps, newConfig.mediumTradeBps, newConfig.largeTradeBps, newConfig.whaleTradeBps
+        );
+    }
+
+    /**
+     * @notice Set slippage to conservative mode (0.3% - 2%)
+     * @dev Only owner can update
+     */
+    function setConservativeSlippage() external onlyOwner {
+        slippageConfig = SlippageProtection.getConservativeConfig();
+
+        emit SlippageConfigUpdated(
+            slippageConfig.smallTradeBps,
+            slippageConfig.mediumTradeBps,
+            slippageConfig.largeTradeBps,
+            slippageConfig.whaleTradeBps
+        );
+    }
+
+    /**
+     * @notice Set slippage to moderate mode (0.5% - 3%)
+     * @dev Only owner can update
+     */
+    function setModerateSlippage() external onlyOwner {
+        slippageConfig = SlippageProtection.getModerateConfig();
+
+        emit SlippageConfigUpdated(
+            slippageConfig.smallTradeBps,
+            slippageConfig.mediumTradeBps,
+            slippageConfig.largeTradeBps,
+            slippageConfig.whaleTradeBps
+        );
+    }
+
+    /**
+     * @notice Set slippage to aggressive mode (1% - 5%)
+     * @dev Only owner can update
+     */
+    function setAggressiveSlippage() external onlyOwner {
+        slippageConfig = SlippageProtection.getAggressiveConfig();
+
+        emit SlippageConfigUpdated(
+            slippageConfig.smallTradeBps,
+            slippageConfig.mediumTradeBps,
+            slippageConfig.largeTradeBps,
+            slippageConfig.whaleTradeBps
+        );
+    }
+
+    /**
+     * @notice Get current slippage configuration
+     * @return config Current slippage config
+     */
+    function getSlippageConfig() external view returns (SlippageProtection.SlippageConfig memory) {
+        return slippageConfig;
+    }
+
+    /**
+     * @notice Get price oracle address
+     * @return oracle Price oracle address
+     */
+    function getPriceOracle() external view returns (address) {
+        return address(priceOracle);
+    }
+
+    /**
+     * @notice Preview slippage for a given trade
+     * @param tokenIn Input token address
+     * @param tokenOut Output token address
+     * @param amountIn Input amount
+     * @return result Slippage calculation result
+     */
+    function previewSlippage(address tokenIn, address tokenOut, uint256 amountIn)
+        external
+        view
+        returns (SlippageProtection.SlippageResult memory)
+    {
+        SlippageProtection.SwapParams memory params = SlippageProtection.SwapParams({
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: amountIn,
+            priceOracle: address(priceOracle),
+            config: slippageConfig
+        });
+
+        return SlippageProtection.previewSlippage(params);
     }
 }

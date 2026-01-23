@@ -9,6 +9,8 @@ import {EmergencyPause} from "./EmergencyPause.sol";
 import {IPerformanceTracking} from "./interfaces/IPerformanceTracking.sol";
 import {IFeeManager} from "./interfaces/IFeeManager.sol";
 import {IStrategyRegistry} from "./interfaces/IStrategyRegistry.sol";
+import {AIStrategyValidator, AIStrategyOutput, ValidatedStrategy} from "./validators/AIStrategyValidator.sol";
+import {StrategyExecutor} from "./StrategyExecutor.sol";
 
 /**
  * @title UserVault
@@ -104,6 +106,12 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     /// @notice Strategy registry contract
     IStrategyRegistry public strategyRegistry;
 
+    /// @notice AI Strategy Validator (zero-trust AI validation)
+    AIStrategyValidator public aiStrategyValidator;
+
+    /// @notice Strategy Executor (modular adapter routing)
+    StrategyExecutor public strategyExecutor;
+
     /// @notice Last rebalance timestamp per strategy id
     mapping(uint256 => uint256) public lastRebalance;
 
@@ -138,6 +146,9 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     event RebalanceError(bytes reason);
     event StrategyMigrated(address indexed user, uint256 indexed strategyId, uint256 fromVersion, uint256 toVersion, uint256 amount);
     event StrategyVersionSet(address indexed user, uint256 versionId);
+    event AIStrategyCreated(address indexed user, bytes32 indexed strategyHash, uint8 riskLevel, uint16 creatorFee);
+    event AIValidatorSet(address indexed validator);
+    event StrategyExecutorSet(address indexed executor);
 
     // ============ ERRORS ============
 
@@ -164,6 +175,8 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     error DowngradeNotAllowed();
     error MigrationFailed();
     error AdapterDepositFailed();
+    error AIValidationFailed();
+    error ValidatorNotSet();
     // AdapterPausedError is inherited from EmergencyPause
 
     // ============ CONSTRUCTOR ============
@@ -286,6 +299,105 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
         strategies[creator].totalCopies++;
 
         emit StrategyCopied(msg.sender, creator, 0);
+    }
+
+    /**
+     * @notice Create strategy from AI-generated output (ZERO-TRUST VALIDATION)
+     * @param aiOutput Untrusted AI-generated strategy parameters
+     * @param isPublic Whether strategy should be public (user choice)
+     * @dev This function enforces zero-trust AI validation through AIStrategyValidator
+     *      All 12 validation checks are performed on-chain before accepting the strategy
+     *      AI output is treated as adversarial input - no trust assumptions
+     *
+     * SECURITY:
+     * - ✅ All adapters must be whitelisted
+     * - ✅ Allocations must sum to exactly 100%
+     * - ✅ Creator fee capped by risk level
+     * - ✅ No duplicate adapters
+     * - ✅ No dust allocations
+     * - ✅ Risk profile validated
+     * - See AIStrategyValidator for complete 12-point validation
+     */
+    function createStrategyFromAI(AIStrategyOutput calldata aiOutput, bool isPublic)
+        external
+        whenStrategyExecutionNotPaused
+        returns (bytes32 strategyHash)
+    {
+        // Ensure validator is configured
+        if (address(aiStrategyValidator) == address(0)) revert ValidatorNotSet();
+
+        // CRITICAL: Validate AI output through zero-trust validator
+        // This performs all 12 validation checks as specified in AI_STRATEGY_SCHEMA_SPEC.md
+        (ValidatedStrategy memory validated, bool isValid) =
+            aiStrategyValidator.validateAIStrategy(aiOutput);
+
+        // Reject if any validation check failed
+        if (!isValid) revert AIValidationFailed();
+
+        // At this point, the strategy has passed all 12 validation checks:
+        // ✅ Check 1-3: Array and name validation
+        // ✅ Check 4-6: Adapter validation (whitelisted, no duplicates, no zero addresses)
+        // ✅ Check 7-9: Allocation validation (no >100%, no dust, sum=100%)
+        // ✅ Check 10: Risk profile valid
+        // ✅ Check 11-12: Creator fee within limits
+
+        // Convert validated allocations to uint16[] for storage
+        uint16[] memory ratios = validated.allocations;
+
+        // Create strategy using validated parameters
+        Strategy storage s = strategies[msg.sender];
+        s.adapters = validated.adapters;
+        s.ratios = ratios;
+        s.isPublic = isPublic;
+        s.name = aiOutput.strategyName;
+        s.copyFeeBps = validated.approvedCreatorFeeBps;
+        s.creator = msg.sender;
+
+        // Register strategy metadata with registry if configured
+        uint256 strategyId = _strategyIdForUser(msg.sender);
+        if (address(strategyRegistry) != address(0)) {
+            // Create risk disclosure hash from AI output
+            bytes32 riskDisclosureHash = keccak256(abi.encodePacked(aiOutput.riskDisclosure));
+
+            // Register with validated risk level
+            strategyRegistry.registerStrategy(
+                strategyId,
+                msg.sender,
+                validated.riskLevel,
+                riskDisclosureHash
+            );
+        }
+
+        // Set default version if first time
+        if (strategyVersion[msg.sender] == 0) {
+            strategyVersion[msg.sender] = 1;
+            emit StrategyVersionSet(msg.sender, 1);
+        }
+
+        // Add to public list if requested
+        if (isPublic && !isInPublicList[msg.sender]) {
+            publicStrategies.push(msg.sender);
+            isInPublicList[msg.sender] = true;
+        }
+
+        // Emit events
+        emit StrategyCreated(
+            msg.sender,
+            validated.adapters,
+            ratios,
+            isPublic,
+            aiOutput.strategyName,
+            validated.approvedCreatorFeeBps
+        );
+
+        emit AIStrategyCreated(
+            msg.sender,
+            validated.strategyHash,
+            validated.riskLevel,
+            validated.approvedCreatorFeeBps
+        );
+
+        return validated.strategyHash;
     }
 
     /**
@@ -548,8 +660,16 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
      * @param adapters Array of adapter addresses
      * @param ratios Allocation ratios
      * @param amount Total amount to split
+     * @dev Uses StrategyExecutor if configured, otherwise falls back to direct execution
      */
     function _executeDeposit(address[] memory adapters, uint16[] memory ratios, uint256 amount) internal {
+        // Use StrategyExecutor if configured (modular routing)
+        if (address(strategyExecutor) != address(0)) {
+            _executeDepositViaExecutor(adapters, ratios, amount);
+            return;
+        }
+
+        // Fallback: Direct execution (legacy mode)
         uint256 remaining = amount;
         uint256 len = adapters.length;
         for (uint256 i = 0; i < len;) {
@@ -579,17 +699,59 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
     }
 
     /**
+     * @notice Execute deposit via StrategyExecutor (modular routing)
+     * @param adapters Array of adapter addresses
+     * @param ratios Allocation ratios
+     * @param amount Total amount to split
+     */
+    function _executeDepositViaExecutor(
+        address[] memory adapters,
+        uint16[] memory ratios,
+        uint256 amount
+    ) internal {
+        // Approve executor to spend vault's assets
+        ASSET.forceApprove(address(strategyExecutor), amount);
+
+        // Prepare deposit parameters (no custom calldata, use standard interface)
+        bytes[] memory emptyCalldata = new bytes[](0);
+
+        StrategyExecutor.DepositParams memory params = StrategyExecutor.DepositParams({
+            adapters: adapters,
+            ratios: ratios,
+            amount: amount,
+            callData: emptyCalldata
+        });
+
+        // Execute via StrategyExecutor
+        StrategyExecutor.ExecutionResult[] memory results = strategyExecutor.executeDeposit(params);
+
+        // Update cached balances based on execution results
+        for (uint256 i = 0; i < results.length; i++) {
+            adapterCached[adapters[i]] += results[i].shares;
+        }
+
+        // Reset approval
+        ASSET.forceApprove(address(strategyExecutor), 0);
+    }
+
+    /**
      * @notice Execute withdrawal from all adapters
      * @param adapters Array of adapter addresses
-    * @param ratios Allocation ratios (for proportional withdrawal)
-    * @param assetAmount Total asset-equivalent amount to withdraw across adapters
+     * @param ratios Allocation ratios (for proportional withdrawal)
+     * @param assetAmount Total asset-equivalent amount to withdraw across adapters
      * @return totalWithdrawn Total amount withdrawn
+     * @dev Uses StrategyExecutor if configured, otherwise falls back to direct execution
      */
     function _executeWithdraw(address[] memory adapters, uint16[] memory ratios, uint256 assetAmount)
         internal
         returns (uint256 totalWithdrawn)
     {
-        // assetAmount is the total asset-equivalent amount to withdraw for the strategy
+        // Use StrategyExecutor if configured (modular routing)
+        if (address(strategyExecutor) != address(0)) {
+            return _executeWithdrawViaExecutor(adapters, ratios, assetAmount);
+        }
+
+        // Fallback: Direct execution (legacy mode)
         uint256 len = adapters.length;
         for (uint256 i = 0; i < len;) {
             uint256 adapterAmount = (assetAmount * ratios[i]) / TOTAL_BPS;
@@ -605,6 +767,48 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
             }
             unchecked { ++i; }
         }
+        return totalWithdrawn;
+    }
+
+    /**
+     * @notice Execute withdrawal via StrategyExecutor (modular routing)
+     * @param adapters Array of adapter addresses
+     * @param ratios Allocation ratios
+     * @param assetAmount Total amount to withdraw
+     * @return totalWithdrawn Total amount withdrawn
+     */
+    function _executeWithdrawViaExecutor(
+        address[] memory adapters,
+        uint16[] memory ratios,
+        uint256 assetAmount
+    ) internal returns (uint256 totalWithdrawn) {
+        // Prepare withdrawal parameters (no custom calldata, use standard interface)
+        bytes[] memory emptyCalldata = new bytes[](0);
+
+        StrategyExecutor.WithdrawParams memory params = StrategyExecutor.WithdrawParams({
+            adapters: adapters,
+            ratios: ratios,
+            amount: assetAmount,
+            callData: emptyCalldata
+        });
+
+        // Execute via StrategyExecutor
+        StrategyExecutor.ExecutionResult[] memory results = strategyExecutor.executeWithdraw(params);
+
+        // Update cached balances and sum total withdrawn
+        for (uint256 i = 0; i < results.length; i++) {
+            uint256 withdrawn = results[i].shares;
+
+            // Reduce cached adapter balance
+            if (adapterCached[adapters[i]] > withdrawn) {
+                adapterCached[adapters[i]] -= withdrawn;
+            } else {
+                adapterCached[adapters[i]] = 0;
+            }
+
+            totalWithdrawn += withdrawn;
+        }
+
         return totalWithdrawn;
     }
 
@@ -722,6 +926,26 @@ contract UserVault is ReentrancyGuard, EmergencyPause {
      */
     function setStrategyRegistry(address registry) external onlyPauseOwner {
         strategyRegistry = IStrategyRegistry(registry);
+    }
+
+    /**
+     * @notice Set the AI Strategy Validator contract (zero-trust AI validation)
+     * @param validator Address of the `AIStrategyValidator` contract
+     */
+    function setAIStrategyValidator(address validator) external onlyPauseOwner {
+        require(validator != address(0), "Invalid validator address");
+        aiStrategyValidator = AIStrategyValidator(validator);
+        emit AIValidatorSet(validator);
+    }
+
+    /**
+     * @notice Set the Strategy Executor contract (modular adapter routing)
+     * @param executor Address of the `StrategyExecutor` contract
+     */
+    function setStrategyExecutor(address executor) external onlyPauseOwner {
+        require(executor != address(0), "Invalid executor address");
+        strategyExecutor = StrategyExecutor(executor);
+        emit StrategyExecutorSet(executor);
     }
 
     function setMinRebalanceInterval(uint256 secs) external onlyPauseOwner {

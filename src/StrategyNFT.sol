@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AIStrategyValidator, AIStrategyOutput, ValidatedStrategy} from "./validators/AIStrategyValidator.sol";
 
 /**
  * @title StrategyNFT
@@ -82,6 +85,14 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     event StrategyValidatorSet(address indexed validator);
 
+    event AIValidatorSet(address indexed validator);
+
+    event FeeEarned(uint256 indexed tokenId, address indexed earner, uint256 amount);
+
+    event FeeClaimed(uint256 indexed tokenId, address indexed claimer, uint256 amount);
+
+    event VaultAuthorized(address indexed vault, bool authorized);
+
     // ============================================================================
     // STATE VARIABLES
     // ============================================================================
@@ -100,8 +111,28 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
     // Mapping: tokenId => pending updates (for versioning)
     mapping(uint256 => StrategyUpdateRequest) public pendingUpdates;
 
-    // Strategy validator for custom validation logic
+    // Strategy validator for custom validation logic (legacy)
     IStrategyValidator public strategyValidator;
+
+    // AI Strategy Validator (zero-trust validation)
+    AIStrategyValidator public aiStrategyValidator;
+
+    // Base asset for fee payments (USDC)
+    IERC20 public immutable ASSET;
+
+    // Fee earnings tracking per NFT
+    struct FeeEarnings {
+        uint256 totalEarned;   // Total fees earned all-time
+        uint256 claimed;       // Total fees claimed
+        uint256 pending;       // Current pending fees
+    }
+    mapping(uint256 => FeeEarnings) public feeEarnings;
+
+    // Authorized vaults that can record fees/deposits
+    mapping(address => bool) public authorizedVaults;
+
+    // Total fees collected across all strategies
+    uint256 public totalFeesCollected;
 
     // Configuration constraints
     uint16 public constant MAX_CREATOR_FEE_BPS = 1000;  // 10% max
@@ -113,7 +144,10 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
     // INITIALIZATION
     // ============================================================================
 
-    constructor() ERC721("MALGIST Strategy", "MAL-STRAT") Ownable(msg.sender) {}
+    constructor(address _asset) ERC721("MALGIST Strategy", "MAL-STRAT") Ownable(msg.sender) {
+        require(_asset != address(0), "Invalid asset");
+        ASSET = IERC20(_asset);
+    }
 
     // ============================================================================
     // STRATEGY CREATION
@@ -206,6 +240,69 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
         creatorStrategies[msg.sender].push(tokenId);
 
         emit StrategyCreated(tokenId, msg.sender, adapters, ratios, riskLevel);
+
+        return tokenId;
+    }
+
+    /**
+     * @notice Create strategy NFT from AI-generated output (ZERO-TRUST VALIDATION)
+     * @param aiOutput AI-generated strategy parameters (untrusted)
+     * @return tokenId Minted strategy NFT token ID
+     * @dev Validates through AIStrategyValidator (12-point validation)
+     *      Mints ERC721 NFT to msg.sender
+     *      Stores immutable strategy metadata on-chain
+     */
+    function mintStrategyFromAI(AIStrategyOutput calldata aiOutput)
+        external
+        nonReentrant
+        returns (uint256)
+    {
+        require(address(aiStrategyValidator) != address(0), "AI validator not set");
+
+        // CRITICAL: Validate AI output (zero-trust)
+        (ValidatedStrategy memory validated, bool isValid) =
+            aiStrategyValidator.validateAIStrategy(aiOutput);
+
+        require(isValid, "AI validation failed");
+
+        // Mint NFT
+        uint256 tokenId = _tokenIdCounter;
+        _tokenIdCounter++;
+
+        _safeMint(msg.sender, tokenId);
+
+        // Store strategy config from validated AI output
+        strategies[tokenId] = StrategyConfig({
+            adapters: validated.adapters,
+            ratios: validated.allocations,
+            creator: msg.sender,
+            creatorFeeBps: validated.approvedCreatorFeeBps,
+            riskLevel: validated.riskLevel,
+            isActive: true,
+            createdAt: uint40(block.timestamp),
+            version: 1,
+            rebalanceFrequency: 0, // Can be set later
+            strategistName: keccak256(abi.encodePacked(aiOutput.strategyName)),
+            slippageToleranceBps: 0 // Default, can be configured later
+        });
+
+        // Track creator ownership
+        creatorStrategies[msg.sender].push(tokenId);
+
+        // Initialize fee earnings
+        feeEarnings[tokenId] = FeeEarnings({
+            totalEarned: 0,
+            claimed: 0,
+            pending: 0
+        });
+
+        emit StrategyCreated(
+            tokenId,
+            msg.sender,
+            validated.adapters,
+            validated.allocations,
+            validated.riskLevel
+        );
 
         return tokenId;
     }
@@ -430,16 +527,139 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
     }
 
     // ============================================================================
+    // FEE MANAGEMENT
+    // ============================================================================
+
+    /**
+     * @notice Record fee earnings for a strategy NFT
+     * @param tokenId Strategy NFT token ID
+     * @param amount Fee amount earned
+     * @dev Can only be called by authorized vaults
+     */
+    function recordFeeEarnings(uint256 tokenId, uint256 amount) external {
+        require(authorizedVaults[msg.sender], "Unauthorized vault");
+        require(_ownerOf(tokenId) != address(0), "Strategy does not exist");
+        require(amount > 0, "Zero amount");
+
+        FeeEarnings storage earnings = feeEarnings[tokenId];
+        earnings.totalEarned += amount;
+        earnings.pending += amount;
+
+        totalFeesCollected += amount;
+
+        emit FeeEarned(tokenId, ownerOf(tokenId), amount);
+    }
+
+    /**
+     * @notice Claim pending fee earnings for owned strategy NFT
+     * @param tokenId Strategy NFT token ID
+     * @return claimed Amount of fees claimed
+     */
+    function claimFees(uint256 tokenId) external nonReentrant returns (uint256 claimed) {
+        require(ownerOf(tokenId) == msg.sender, "Not NFT owner");
+
+        FeeEarnings storage earnings = feeEarnings[tokenId];
+        require(earnings.pending > 0, "No fees to claim");
+
+        claimed = earnings.pending;
+        earnings.claimed += claimed;
+        earnings.pending = 0;
+
+        // Transfer fees to NFT holder
+        SafeERC20.safeTransfer(ASSET, msg.sender, claimed);
+
+        emit FeeClaimed(tokenId, msg.sender, claimed);
+
+        return claimed;
+    }
+
+    /**
+     * @notice Batch claim fees from multiple strategy NFTs
+     * @param tokenIds Array of token IDs to claim from
+     * @return totalClaimed Total amount claimed across all NFTs
+     */
+    function batchClaimFees(uint256[] calldata tokenIds)
+        external
+        nonReentrant
+        returns (uint256 totalClaimed)
+    {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+
+            // Skip if not owner or no pending fees
+            if (ownerOf(tokenId) != msg.sender) continue;
+
+            FeeEarnings storage earnings = feeEarnings[tokenId];
+            if (earnings.pending == 0) continue;
+
+            uint256 claimed = earnings.pending;
+            earnings.claimed += claimed;
+            earnings.pending = 0;
+
+            totalClaimed += claimed;
+
+            emit FeeClaimed(tokenId, msg.sender, claimed);
+        }
+
+        if (totalClaimed > 0) {
+            SafeERC20.safeTransfer(ASSET, msg.sender, totalClaimed);
+        }
+
+        return totalClaimed;
+    }
+
+    /**
+     * @notice Get total pending fees for all strategies owned by an address
+     * @param owner Address to query
+     * @return totalPending Total pending fees across all owned strategies
+     */
+    function getTotalPendingFees(address owner) external view returns (uint256 totalPending) {
+        uint256 balance = balanceOf(owner);
+
+        for (uint256 i = 0; i < balance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(owner, i);
+            totalPending += feeEarnings[tokenId].pending;
+        }
+
+        return totalPending;
+    }
+
+    // ============================================================================
+    // VAULT AUTHORIZATION (Admin)
+    // ============================================================================
+
+    /**
+     * @notice Authorize/deauthorize vault to record fees
+     * @param vault Vault address
+     * @param authorized Authorization status
+     */
+    function setVaultAuthorization(address vault, bool authorized) external onlyOwner {
+        require(vault != address(0), "Invalid vault");
+        authorizedVaults[vault] = authorized;
+        emit VaultAuthorized(vault, authorized);
+    }
+
+    // ============================================================================
     // VALIDATOR SETUP (Admin)
     // ============================================================================
 
     /**
-     * @notice Set custom strategy validator
+     * @notice Set custom strategy validator (legacy)
      * @param validator Strategy validator contract
      */
     function setStrategyValidator(address validator) external onlyOwner {
         strategyValidator = IStrategyValidator(validator);
         emit StrategyValidatorSet(validator);
+    }
+
+    /**
+     * @notice Set AI Strategy Validator (zero-trust AI validation)
+     * @param validator AIStrategyValidator contract address
+     */
+    function setAIStrategyValidator(address validator) external onlyOwner {
+        require(validator != address(0), "Invalid validator");
+        aiStrategyValidator = AIStrategyValidator(validator);
+        emit AIValidatorSet(validator);
     }
 
     // ============================================================================
@@ -487,5 +707,28 @@ contract StrategyNFT is ERC721Enumerable, Ownable, ReentrancyGuard {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * @notice Hook that is called before any token transfer
+     * @dev Used to handle creator updates when NFT ownership changes
+     *      When NFT is transferred, the new owner becomes the fee recipient
+     */
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        virtual
+        override(ERC721Enumerable)
+        returns (address)
+    {
+        address previousOwner = super._update(to, tokenId, auth);
+
+        // Only update creator tracking for actual transfers (not mints/burns)
+        if (previousOwner != address(0) && to != address(0)) {
+            // Strategy creator (original) doesn't change, but fee recipient is now new owner
+            // This is intentional: creator field stays immutable for attribution
+            // but fees go to current NFT holder
+        }
+
+        return previousOwner;
     }
 }

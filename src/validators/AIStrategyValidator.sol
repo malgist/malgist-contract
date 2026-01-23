@@ -13,6 +13,11 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+// Optional: AdapterGovernance interface for staged rollout
+interface IAdapterGovernance {
+    function isAdapterApproved(address adapter) external view returns (bool);
+}
+
 // ============================================================================
 // INTERFACES & TYPES
 // ============================================================================
@@ -61,9 +66,12 @@ contract AIStrategyValidator is Ownable(msg.sender) {
     mapping(string => uint8) public riskProfileToLevel;           // Profile string → 1-5
     mapping(uint8 => uint16) public riskLevelToMaxFee;            // Risk → max fee allowed
 
-    // Adapter registry
+    // Adapter registry (legacy - direct whitelist)
     mapping(address => bool) public whitelistedAdapters;
     mapping(address => bytes32) public adapterIdentifiers;        // For verification
+
+    // Optional: AdapterGovernance integration (staged rollout)
+    IAdapterGovernance public adapterGovernance;
 
     // ========================================================================
     // EVENTS
@@ -88,6 +96,8 @@ contract AIStrategyValidator is Ownable(msg.sender) {
         uint8 riskLevel,
         uint16 maxFeeBps
     );
+
+    event AdapterGovernanceSet(address indexed governance);
 
     // ========================================================================
     // INITIALIZATION
@@ -138,6 +148,35 @@ contract AIStrategyValidator is Ownable(msg.sender) {
     function blacklistAdapter(address adapter) external onlyOwner {
         whitelistedAdapters[adapter] = false;
         adapterIdentifiers[adapter] = bytes32(0);
+    }
+
+    /**
+     * @notice Set AdapterGovernance contract (optional staged rollout)
+     * @param governance Address of AdapterGovernance contract
+     * @dev If set, validator will check AdapterGovernance.isAdapterApproved()
+     *      in addition to local whitelist
+     */
+    function setAdapterGovernance(address governance) external onlyOwner {
+        adapterGovernance = IAdapterGovernance(governance);
+        emit AdapterGovernanceSet(governance);
+    }
+
+    /**
+     * @notice Check if adapter is whitelisted (with governance integration)
+     * @param adapter Adapter address
+     * @return isWhitelisted True if adapter is whitelisted
+     * @dev Checks both local whitelist AND AdapterGovernance (if configured)
+     */
+    function _isAdapterWhitelisted(address adapter) internal view returns (bool) {
+        // Check local whitelist first
+        if (whitelistedAdapters[adapter]) return true;
+
+        // If AdapterGovernance is configured, check there too
+        if (address(adapterGovernance) != address(0)) {
+            return adapterGovernance.isAdapterApproved(adapter);
+        }
+
+        return false;
     }
 
     // ========================================================================
@@ -210,8 +249,8 @@ contract AIStrategyValidator is Ownable(msg.sender) {
                 return (validated, false);
             }
 
-            // Check 5: Adapter is whitelisted
-            if (!whitelistedAdapters[adapter]) {
+            // Check 5: Adapter is whitelisted (checks both local + governance)
+            if (!_isAdapterWhitelisted(adapter)) {
                 emit ValidationFailed(
                     "Adapter not whitelisted",
                     aiOutput.riskProfile,
@@ -390,9 +429,10 @@ contract AIStrategyValidator is Ownable(msg.sender) {
      * @notice Check if an adapter is whitelisted
      * @param adapter Adapter address
      * @return isWhitelisted True if adapter is approved
+     * @dev Checks both local whitelist AND AdapterGovernance (if configured)
      */
     function isAdapterWhitelisted(address adapter) external view returns (bool) {
-        return whitelistedAdapters[adapter];
+        return _isAdapterWhitelisted(adapter);
     }
 
     /**
