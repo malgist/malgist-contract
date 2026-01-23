@@ -7,9 +7,9 @@ pragma solidity ^0.8.20;
 
 
 import "forge-std/Test.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {FeeManager} from "../src/FeeManager.sol";
-import {IFeeManager} from "../src/interfaces/IFeeManager.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {FeeManager} from "../../src/FeeManager.sol";
+import {IFeeManager} from "../../src/interfaces/IFeeManager.sol";
 
 contract MockVault {
     MockERC20 public token;

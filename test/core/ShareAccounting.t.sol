@@ -7,9 +7,9 @@ pragma solidity ^0.8.20;
 
 
 import "forge-std/Test.sol";
-import "../src/mocks/MockERC20.sol";
-import "../src/mocks/MockAdapter.sol";
-import "../src/UserVault.sol";
+import "../../src/mocks/MockERC20.sol";
+import "../../src/mocks/MockAdapter.sol";
+import "../../src/UserVault.sol";
 
 contract ShareAccountingTest is Test {
     MockERC20 token;

@@ -7,9 +7,9 @@ pragma solidity ^0.8.20;
 
 
 import "forge-std/Test.sol";
-import "../src/StrategyNFT.sol";
-import "../src/StrategyVault.sol";
-import "../src/validators/StrategyValidator.sol";
+import "../../src/StrategyNFT.sol";
+import "../../src/StrategyVault.sol";
+import "../../src/validators/StrategyValidator.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 

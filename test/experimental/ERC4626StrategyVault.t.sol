@@ -7,9 +7,9 @@ pragma solidity ^0.8.20;
 
 
 import "forge-std/Test.sol";
-import "../src/ERC4626StrategyVault.sol";
-import "../src/interfaces/IAdapter.sol";
-import "../src/mocks/MockERC20.sol";
+import "../../src/ERC4626StrategyVault.sol";
+import "../../src/interfaces/IAdapter.sol";
+import "../../src/mocks/MockERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**

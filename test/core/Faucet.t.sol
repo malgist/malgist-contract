@@ -7,8 +7,8 @@ pragma solidity ^0.8.20;
 
 
 import {Test} from "forge-std/Test.sol";
-import {Faucet} from "../src/Faucet.sol";
-import {MockUSDC} from "../src/mocks/MockUSDC.sol";
+import {Faucet} from "../../src/Faucet.sol";
+import {MockUSDC} from "../../src/mocks/MockUSDC.sol";
 
 /**
  * @title FaucetTest

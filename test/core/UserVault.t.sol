@@ -8,10 +8,10 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {UserVault} from "../src/UserVault.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {MockLendingPool} from "../src/mocks/MockLendingPool.sol";
-import {LendleAdapter} from "../src/adapters/LendleAdapter.sol";
+import {UserVault} from "../../src/UserVault.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {MockLendingPool} from "../../src/mocks/MockLendingPool.sol";
+import {LendleAdapter} from "../../src/adapters/LendleAdapter.sol";
 
 /**
  * @title UserVaultTest

@@ -7,10 +7,10 @@ pragma solidity ^0.8.20;
 
 
 import {Test} from "forge-std/Test.sol";
-import {UniversalVault} from "../src/UniversalVault.sol";
-import {EmergencyPause, IEmergencyPauseEvents, IEmergencyPauseErrors} from "../src/EmergencyPause.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {MockAdapter} from "../src/mocks/MockAdapter.sol";
+import {UniversalVault} from "../../src/UniversalVault.sol";
+import {EmergencyPause, IEmergencyPauseEvents, IEmergencyPauseErrors} from "../../src/EmergencyPause.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {MockAdapter} from "../../src/mocks/MockAdapter.sol";
 
 /**
  * @title EmergencyPauseTest

@@ -12,8 +12,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 // Import adapters (assuming they exist in src/adapters/)
-import {AdapterBase} from "../src/adapters/AdapterBase.sol";
-import {HardenedAaveV3Adapter} from "../src/adapters/HardenedAaveV3Adapter.sol";
+import {AdapterBase} from "../../src/adapters/AdapterBase.sol";
+import {HardenedAaveV3Adapter} from "../../src/adapters/HardenedAaveV3Adapter.sol";
 
 /**
  * @title AdapterAccessControlTest

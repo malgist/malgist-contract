@@ -7,10 +7,10 @@ pragma solidity ^0.8.20;
 
 
 import {Test} from "forge-std/Test.sol";
-import {UserVault} from "../src/UserVault.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {MockAdapter} from "../src/mocks/MockAdapter.sol";
-import {StrategyRegistry} from "../src/StrategyRegistry.sol";
+import {UserVault} from "../../src/UserVault.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {MockAdapter} from "../../src/mocks/MockAdapter.sol";
+import {StrategyRegistry} from "../../src/StrategyRegistry.sol";
 
 contract StrategyVersioningTest is Test {
     UserVault public vault;

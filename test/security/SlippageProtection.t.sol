@@ -10,10 +10,10 @@ import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {SlippageProtection} from "../src/SlippageProtection.sol";
-import {IAdapterV2} from "../src/interfaces/IAdapterV2.sol";
-import {FusionXAdapterV2Example} from "../src/adapters/FusionXAdapterV2Example.sol";
-import {LendleAdapterV2Example} from "../src/adapters/LendleAdapterV2Example.sol";
+import {SlippageProtection} from "../../src/SlippageProtection.sol";
+import {IAdapterV2} from "../../src/interfaces/IAdapterV2.sol";
+import {FusionXAdapterV2Example} from "../../src/adapters/FusionXAdapterV2Example.sol";
+import {LendleAdapterV2Example} from "../../src/adapters/LendleAdapterV2Example.sol";
 
 /**
  * @title SlippageProtectionTest

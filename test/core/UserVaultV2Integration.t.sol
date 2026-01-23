@@ -8,13 +8,13 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {UserVaultV2} from "../src/UserVaultV2.sol";
-import {FusionXAdapterV2} from "../src/adapters/FusionXAdapterV2.sol";
-import {LendleAdapter} from "../src/adapters/LendleAdapter.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {MockLendingPool} from "../src/mocks/MockLendingPool.sol";
-import {MockUniswapV2Router} from "../src/mocks/MockUniswapV2Router.sol";
-import {MockUniswapV2Pair} from "../src/mocks/MockUniswapV2Pair.sol";
+import {UserVaultV2} from "../../src/UserVaultV2.sol";
+import {FusionXAdapterV2} from "../../src/adapters/FusionXAdapterV2.sol";
+import {LendleAdapter} from "../../src/adapters/LendleAdapter.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {MockLendingPool} from "../../src/mocks/MockLendingPool.sol";
+import {MockUniswapV2Router} from "../../src/mocks/MockUniswapV2Router.sol";
+import {MockUniswapV2Pair} from "../../src/mocks/MockUniswapV2Pair.sol";
 
 /**
  * @title UserVaultV2IntegrationTest
