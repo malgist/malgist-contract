@@ -337,13 +337,21 @@ forge script script/DeployUserVault.s.sol \
 
 ## 📍 Deployed Addresses (Mantle Sepolia Testnet)
 
+### ✅ New Strategy Contracts (Deployed Jan 23, 2025)
+
+| Contract                 | Address                                      | Status  | Deployment Date |
+| ----------------------- | -------------------------------------------- | ------- | --------------- |
+| **StrategyNFT**         | `0xCB998705E25a9f601B25028e2f0B51629259B2F8` | ✅ Live | Jan 23, 2025    |
+| **AIStrategyValidator** | `0x5D28BA65d8397DB05FF0170668D993Ae21f6A239` | ✅ Live | Jan 23, 2025    |
+| **StrategyExecutor**    | `0x8d060d27BAD3818C0a22FaE125ef1237A7B1F60e` | ✅ Live | Jan 23, 2025    |
+| **AdapterGovernance**   | `0xEe5bbdF4143ab058eB1eDfC0116b754020016E2D` | ✅ Live | Jan 23, 2025    |
+| **PriceOracle**         | `0x9A6398376fC1E8a1474CD0E993497828B55F8571` | ✅ Live | Jan 23, 2025    |
+
+### ✅ Core Contracts (Deployed Dec 9, 2024)
+
 | Contract                 | Address                                      | Status  | Notes       |
 | ----------------------- | -------------------------------------------- | ------- | ----------- |
 | **UserVault**           | `0x65B43c257c885259360b7165C2773e0d53053b68` | ✅ Live | Core vault  |
-| **StrategyNFT**         | `TBD` (Deploy via script)                     | 🔄 Soon | NFT minting |
-| **AIStrategyValidator** | `TBD` (Deploy via script)                     | 🔄 Soon | AI validation |
-| **AdapterGovernance**   | `TBD` (Deploy via script)                     | 🔄 Soon | Timelock    |
-| **PriceOracle**         | `TBD` (Deploy via script)                     | 🔄 Soon | Chainlink   |
 | **StrategyRegistry**    | `0xE0586D68334d0A70157ff34944861dE9e96A875A` | ✅ Live | Versioning  |
 | **AdapterRegistry**     | `0xE0586D68334d0A70157ff34944861dE9e96A875A` | ✅ Live | Registry    |
 | **FeeManager**          | `0xf5D0474e3995E06bb8426537B39Ae55b84a6daD8` | ✅ Live | Fee collection |
