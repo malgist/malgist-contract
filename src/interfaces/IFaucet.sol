@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by Faucet.sol, Faucet.t.sol
+ * @notes Interface for faucet automation scripts.
+ */
+
 /**
  * @title IFaucet
  * @notice Interface for MALGIST testnet faucet

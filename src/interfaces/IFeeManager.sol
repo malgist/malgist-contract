@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by FeeManager.sol, UserVault.sol
+ * @notes Interface for fee accounting modules.
+ */
+
 interface IFeeManager {
     /// @notice Charge fees on a gross yield amount previously transferred to the FeeManager
     /// @param strategyId Strategy identifier (opaque to FeeManager, passed for logging)

@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: ACTIVE
+# Usage: ./scripts/helpers/deploy-with-check.sh
+# Env: .env (PRIVATE_KEY, MANTLE_SEPOLIA_RPC)
+# Notes: Preflight balance checks plus DeployUserVault broadcast.
 # Check balance and deploy properly
 
 source .env

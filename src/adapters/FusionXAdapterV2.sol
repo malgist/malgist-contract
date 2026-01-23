@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Labs only
+ * @used-by Adapter research
+ * @notes Pending upgrade path for FusionX kept off-chain.
+ */
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAdapter} from "../interfaces/IAdapter.sol";

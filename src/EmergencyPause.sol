@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by UserVault.sol, UniversalVault*.sol
+ * @notes Global + per-adapter circuit breaker that always exempts withdrawals.
+ */
+
 /**
  * @title EmergencyPause
  * @notice Emergency control system for MALGIST vault

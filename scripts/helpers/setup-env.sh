@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: ACTIVE
+# Usage: ./scripts/helpers/setup-env.sh
+# Env: .env (PRIVATE_KEY, MANTLE_SEPOLIA_RPC)
+# Notes: Loads env vars, validates key format, and preps DeployUserVault runs.
 # Quick environment setup script for Malgist deployment
 
 echo "========================================="

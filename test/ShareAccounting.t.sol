@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-ACCOUNTING
+/// @covers UserVault
+/// @notes Verifies share mint/burn + reconcile flows around adapters.
+
+
 import "forge-std/Test.sol";
 import "../src/mocks/MockERC20.sol";
 import "../src/mocks/MockAdapter.sol";

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-DATA
+/// @covers StrategyNFT
+/// @notes Protects ERC721 metadata + versioning behavior.
+
+
 import "forge-std/Test.sol";
 import "../src/StrategyNFT.sol";
 import "../src/StrategyVault.sol";
@@ -38,7 +43,7 @@ contract StrategyNFTTest is Test {
 
     function setUp() public {
         token = new MockERC20Test();
-        strategyNFT = new StrategyNFT();
+        strategyNFT = new StrategyNFT(address(this));
         validator = new StrategyValidator();
 
         // Whitelist adapters
@@ -341,7 +346,7 @@ contract StrategyVaultTest is Test {
 
     function setUp() public {
         token = new MockERC20Test();
-        strategyNFT = new StrategyNFT();
+        strategyNFT = new StrategyNFT(address(this));
         vault = new StrategyVault(address(strategyNFT), address(token));
 
         // Whitelist adapter

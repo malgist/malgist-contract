@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: LEGACY
+# Usage: ./scripts/helpers/deploy-final.sh
+# Env: .env (PRIVATE_KEY, MANTLE_SEPOLIA_RPC)
+# Notes: Older emergency redeploy workflow kept for reference.
 # Final deployment script - bug fixed
 
 source .env

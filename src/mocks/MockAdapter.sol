@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status TEST-ONLY
+ * @network Local tests
+ * @used-by test suite
+ * @notes Mock adapter for Foundry + Echidna tests.
+ */
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAdapter} from "../interfaces/IAdapter.sol";

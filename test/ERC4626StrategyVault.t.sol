@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type EXPERIMENTAL-ERC4626
+/// @covers ERC4626StrategyVault
+/// @notes Covers prototype ERC4626 vault flows only.
+
+
 import "forge-std/Test.sol";
 import "../src/ERC4626StrategyVault.sol";
 import "../src/interfaces/IAdapter.sol";

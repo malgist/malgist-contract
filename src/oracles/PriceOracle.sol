@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by DeployPriceOracle.s.sol, adapters
+ * @notes Protocol-owned price oracle powering slippage math.
+ */
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 

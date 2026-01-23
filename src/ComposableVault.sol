@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by ComposableVault.t.sol
+ * @notes Legacy composable vault preserved for comparison with UserVault.
+ */
+
 /**
  * @title ComposableVault
  * @notice Vault-of-Vaults implementation with strict invariant protection

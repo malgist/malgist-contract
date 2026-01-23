@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by StrategyExecutor.sol, UserVault.sol
+ * @notes Deterministic validator for human-crafted strategies.
+ */
+
 /**
  * @title StrategyValidator
  * @notice Custom validation contract for strategy configurations

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by UserVault.sol, DeployStrategyExecutor.s.sol
+ * @notes Lightweight storage for strategy metadata consumed by executors.
+ */
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IStrategyRegistry} from "./interfaces/IStrategyRegistry.sol";
 

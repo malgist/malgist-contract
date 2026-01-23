@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @script-status ACTIVE
+ * @network Mantle Sepolia
+ * @usage forge script script/DeployAdapterGovernance.s.sol --broadcast --rpc-url $MANTLE_SEPOLIA_RPC
+ * @env PRIVATE_KEY
+ * @notes Deploys timelock/guardian contract managing adapter approvals.
+ */
+
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {AdapterGovernance} from "../src/governance/AdapterGovernance.sol";

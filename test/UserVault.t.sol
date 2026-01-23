@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-INTEGRATION
+/// @covers UserVault, StrategyExecutor
+/// @notes End-to-end coverage for deposits, withdrawals, and adapter calls.
+
+
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {UserVault} from "../src/UserVault.sol";

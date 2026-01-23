@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type PROPERTY-BASED
+/// @covers UserVault, SlippageProtection
+/// @notes Echidna harness asserting invariants on deposits/withdrawals.
+
+
 import {Test} from "forge-std/Test.sol";
 
 /**

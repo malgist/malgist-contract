@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by PriceOracle.sol consumers
+ * @notes Dynamic slippage math for oracle-integrated swaps.
+ */
+
 /**
  * @title SlippageProtection
  * @notice Dynamic slippage calculation library with price oracle integration

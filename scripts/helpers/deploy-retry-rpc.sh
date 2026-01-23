@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: ACTIVE
+# Usage: ./scripts/helpers/deploy-retry-rpc.sh
+# Env: .env (PRIVATE_KEY)
+# Notes: Retries DeployUserVault across fallback Mantle RPC endpoints.
 # Retry deployment with different RPC endpoints
 
 source .env

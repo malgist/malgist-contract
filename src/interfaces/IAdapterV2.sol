@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by UniversalVaultV2.sol
+ * @notes V2 adapter surface kept for experimental vaults.
+ */
+
 /**
  * @title IAdapterV2
  * @notice Enhanced adapter interface with slippage and deadline protection

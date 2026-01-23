@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by UserVault.sol, StrategyExecutor.sol
+ * @notes Strategy registry interface for off-chain orchestrators.
+ */
+
 interface IStrategyRegistry {
     struct VersionInfo {
         uint256 versionId;

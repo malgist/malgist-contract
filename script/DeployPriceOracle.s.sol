@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @script-status ACTIVE
+ * @network Mantle Sepolia
+ * @usage forge script script/DeployPriceOracle.s.sol --broadcast --rpc-url $MANTLE_SEPOLIA_RPC
+ * @env PRIVATE_KEY
+ * @notes Initializes PriceOracle shell; configure feeds afterward.
+ */
+
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {PriceOracle} from "../src/oracles/PriceOracle.sol";

@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @script-status ACTIVE
+ * @network Mantle Sepolia
+ * @usage forge script script/DeployAIStrategyValidator.s.sol --broadcast --rpc-url $MANTLE_SEPOLIA_RPC
+ * @env PRIVATE_KEY
+ * @notes Ships AIStrategyValidator used by registry + UserVault.
+ */
+
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {AIStrategyValidator} from "../src/validators/AIStrategyValidator.sol";

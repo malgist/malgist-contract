@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: ACTIVE
+# Usage: ./scripts/deploy-faucet.sh
+# Env: PRIVATE_KEY, RPC_URL
+# Notes: Deploys MockUSDC + Faucet to Mantle testnet and records addresses.
 
 ##############################################################################
 # MALGIST Faucet Deployment Script

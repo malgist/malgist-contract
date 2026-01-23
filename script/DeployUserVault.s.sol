@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @script-status ACTIVE
+ * @network Mantle Sepolia staging
+ * @usage forge script script/DeployUserVault.s.sol --broadcast --rpc-url $MANTLE_SEPOLIA_RPC
+ * @env PRIVATE_KEY
+ * @notes Bootstraps mock tokens, protocols, UserVault, and core adapters for demos.
+ */
+
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {UserVault} from "../src/UserVault.sol";

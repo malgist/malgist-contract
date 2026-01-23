@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status TEST-ONLY
+ * @network Local tests
+ * @used-by SlippageProtection + adapter tests
+ * @notes Mock pair for AMM simulations.
+ */
+
 import {MockERC20} from "./MockERC20.sol";
 
 /**

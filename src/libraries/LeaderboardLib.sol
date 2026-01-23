@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status LEGACY
+ * @network Off-chain analytics
+ * @used-by UserVaultV2.sol
+ * @notes Leaderboard sorting helpers only needed by V2.
+ */
+
 /**
  * @title LeaderboardLib
  * @notice Library for efficient on-chain leaderboard sorting and ranking

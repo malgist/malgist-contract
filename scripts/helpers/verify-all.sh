@@ -1,4 +1,8 @@
 #!/bin/bash
+# Status: ACTIVE
+# Usage: ./scripts/helpers/verify-all.sh
+# Env: deployments/addresses.env, .env
+# Notes: Batch forge verify for all Mantle Sepolia contracts.
 # Quick verification script for deployed Malgist contracts on Mantle Sepolia
 
 # Load deployed addresses

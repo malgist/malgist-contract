@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Chain-agnostic
+ * @used-by UniversalVaultV2.sol, StrategyExecutor.sol
+ * @notes Vault-level MEV/deadline guardrails shared across active deployments.
+ */
+
 /**
  * @title SlippageProtection
  * @notice MEV/sandwich attack mitigation system for DeFi vaults

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by UniversalVaultV3.sol
+ * @notes Interface for multi-protocol adapter design.
+ */
+
 /**
  * @title IUniversalAdapter
  * @notice Standard interface for all protocol adapters in MALGIST Universal Vault

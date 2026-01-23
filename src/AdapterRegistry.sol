@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia + staging
+ * @used-by DeployProtocolCore.s.sol, UserVault.sol
+ * @notes Central adapter whitelist and metadata store for vault + executor.
+ */
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IAdapterDeployment} from "./interfaces/IAdapterDeployment.sol";
 
 /**
  * @title AdapterRegistry

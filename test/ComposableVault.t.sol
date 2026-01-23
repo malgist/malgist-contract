@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type EXPERIMENTAL-VAULT
+/// @covers ComposableVault
+/// @notes Regression net for legacy composable vault variant.
+
+
 import "forge-std/Test.sol";
 import "../src/ComposableVault.sol";
 import "../src/interfaces/IComposableVault.sol";

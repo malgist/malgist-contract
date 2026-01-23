@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status LEGACY
+ * @network Test only
+ * @used-by governance docs, local sims
+ * @notes Minimal timelock used in local governance rehearsals only.
+ */
+
 /**
  * @title SimpleTimelock
  * @notice Minimal timelock enabling governance (multisig) to schedule actions that execute after a delay.

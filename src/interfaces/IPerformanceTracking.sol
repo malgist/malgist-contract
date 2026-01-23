@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by PerformanceTracking.sol, UserVault.sol
+ * @notes Interface consumed by vault + analytics tooling.
+ */
+
 interface IPerformanceTracking {
     struct Snapshot {
         uint64 timestamp;

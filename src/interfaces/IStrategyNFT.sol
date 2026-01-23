@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by StrategyNFT.sol, StrategyVault.sol
+ * @notes Interface to share strategy metadata with vaults.
+ */
+
 /// @notice Minimal Strategy NFT interface used by Vault/Registry
 interface IStrategyNFT {
     function ownerOf(uint256 tokenId) external view returns (address);

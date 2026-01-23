@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type LEGACY-INTEGRATION
+/// @covers UserVaultV2
+/// @notes Regression harness for deprecated V2 with leaderboard features.
+
+
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {UserVaultV2} from "../src/UserVaultV2.sol";

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by UserVault.sol, StrategyExecutor.sol
+ * @notes Tracks strategy TVL snapshots and win/loss stats for dashboards.
+ */
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IPerformanceTracking.sol";
 

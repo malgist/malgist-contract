@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status TEST-ONLY
+ * @network Local tests
+ * @used-by test suite
+ * @notes Simple ERC20 used throughout Foundry tests.
+ */
+
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**

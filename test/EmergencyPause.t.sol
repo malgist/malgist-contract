@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-SAFETY
+/// @covers EmergencyPause, UserVault
+/// @notes Ensures circuit breaker keeps withdrawals open and blocks deposits.
+
+
 import {Test} from "forge-std/Test.sol";
 import {UniversalVault} from "../src/UniversalVault.sol";
 import {EmergencyPause, IEmergencyPauseEvents, IEmergencyPauseErrors} from "../src/EmergencyPause.sol";

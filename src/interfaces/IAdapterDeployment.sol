@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Chain-agnostic
+ * @used-by AdapterRegistry.sol, UniversalVaultDeploymentLayer.sol
+ * @notes Interface describing adapter metadata for registries.
+ */
+
 /**
  * @title IAdapterDeployment
  * @notice Minimal, protocol-agnostic adapter interface for deployment-layer abstraction

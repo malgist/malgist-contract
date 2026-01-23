@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-UTILITY
+/// @covers Faucet
+/// @notes Smoke tests faucet drip + throttling on Mantle staging.
+
+
 import {Test} from "forge-std/Test.sol";
 import {Faucet} from "../src/Faucet.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";

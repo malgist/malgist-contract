@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @script-status ACTIVE
+ * @network Mantle Sepolia
+ * @usage forge script script/DeployStrategyExecutor.s.sol --broadcast --rpc-url $MANTLE_SEPOLIA_RPC
+ * @env PRIVATE_KEY, USER_VAULT_ADDRESS, USDC_ADDRESS
+ * @notes Connects StrategyExecutor to production vault + asset.
+ */
+
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {StrategyExecutor} from "../src/StrategyExecutor.sol";

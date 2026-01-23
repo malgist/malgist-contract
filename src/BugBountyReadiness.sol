@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status LEGACY
+ * @network Not deployed
+ * @used-by Documentation only
+ * @notes Audit/bounty scoring helper retained for paperwork parity.
+ */
+
 /**
  * @title BugBountyReadiness
  * @notice Mixin contract providing comprehensive monitoring and transparency for bug bounty programs

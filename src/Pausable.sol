@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status LEGACY
+ * @network Legacy only
+ * @used-by UserVaultV2.sol
+ * @notes Original pause mixin superseded by EmergencyPause but still needed for V2 archives.
+ */
+
 /**
  * @title Pausable
  * @notice Custom pausable implementation for Malgist vault

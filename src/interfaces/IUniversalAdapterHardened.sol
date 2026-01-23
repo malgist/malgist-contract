@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by UniversalVaultV3.sol
+ * @notes Hardened adapter extension kept for audits.
+ */
+
 /**
  * @title IUniversalAdapter (Hardened)
  * @notice Security-hardened interface for MALGIST protocol adapters

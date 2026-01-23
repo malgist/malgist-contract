@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Not deployed
+ * @used-by Cross-chain research
+ * @notes Placeholder for future cross-chain bridging adapters.
+ */
+
 /**
  * @title ICrossChainAdapter
  * @notice Extended interface for cross-chain capable adapters

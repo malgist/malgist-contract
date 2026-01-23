@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-ACCOUNTING
+/// @covers FeeManager
+/// @notes Validates treasury/strategist fee routing math.
+
+
 import "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {FeeManager} from "../src/FeeManager.sol";

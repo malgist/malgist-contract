@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by DeployAIStrategyValidator.s.sol, UserVault.sol
+ * @notes Validates AI-generated strategies before registry ingestion.
+ */
+
 /**
  * @title AIStrategyValidator
  * @notice On-chain validator for AI-generated strategy parameters

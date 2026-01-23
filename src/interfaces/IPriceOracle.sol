@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Mantle Sepolia
+ * @used-by PriceOracle.sol, adapters
+ * @notes Interface for on-chain price oracle wiring.
+ */
+
 /**
  * @title IPriceOracle
  * @notice Interface for price oracle contracts

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type EXPERIMENTAL-KEEPER
+/// @covers AutoRebalanceEngine
+/// @notes Keeper queue simulation; informative only for research builds.
+
+
 import "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockAdapter} from "../src/mocks/MockAdapter.sol";

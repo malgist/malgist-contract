@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status ACTIVE
+ * @network Chain-agnostic
+ * @used-by All adapters + vaults
+ * @notes Primary adapter interface enforced across production code.
+ */
+
 /**
  * @title IAdapter
  * @notice Standard interface for protocol adapters in the Mantle Strategy Studio

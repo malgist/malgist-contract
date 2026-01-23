@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by ERC4626StrategyVault.t.sol
+ * @notes ERC4626-based vault experiment slated for future research.
+ */
+
 /**
  * @title ERC4626StrategyVault
  * @notice ERC-4626 compliant vault wrapper for StrategyVault with adapter routing

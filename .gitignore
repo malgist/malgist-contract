@@ -8,7 +8,15 @@ out/
 /broadcast/**/dry-run/
 
 # Docs
-docs/
+docs/*
+!docs/
+!docs/README.md
+!docs/DEPLOYMENT_CHECKLIST.md
+!docs/DEPLOYMENT_COMPLETE_JAN23_2025.md
+!docs/DEPLOYMENT_STATUS.md
+!docs/DEPLOYMENT_STATUS_JAN23_2025.md
+!docs/DOCUMENTATION_UPDATE_JAN23_2025.md
+!docs/CLEANUP_SUMMARY.md
 
 # Dotenv file
 .env

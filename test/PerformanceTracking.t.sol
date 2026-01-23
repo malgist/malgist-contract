@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-METRICS
+/// @covers PerformanceTracking
+/// @notes Protects performance history snapshots feeding dashboards.
+
+
 import "forge-std/Test.sol";
 import "../src/PerformanceTracking.sol";
 

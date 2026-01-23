@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type LEGACY-VAULT
+/// @covers UniversalVaultV3
+/// @notes Legacy suite for V3 research vault; optional in CI.
+
+
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IUniversalAdapter} from "../src/interfaces/IUniversalAdapter.sol";
 import {UniversalVaultV3} from "../src/UniversalVaultV3.sol";
-import {SlippageProtection} from "../src/SlippageProtection.sol";
-import {EmergencyPause} from "../src/EmergencyPause.sol";
 
 /**
  * @title UniversalVaultTest

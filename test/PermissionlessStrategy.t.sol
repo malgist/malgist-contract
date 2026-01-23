@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @test-type CORE-INTEGRATION
+/// @covers UserVault, StrategyRegistry
+/// @notes Ensures creation phases + caps remain enforced for permissionless flows.
+
+
 import {Test} from "forge-std/Test.sol";
 import {UserVault} from "../src/UserVault.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";

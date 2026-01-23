@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * @status EXPERIMENTAL
+ * @network Prototype only
+ * @used-by ComposableVault.sol
+ * @notes Interface for composable vault research.
+ */
+
 /**
  * @title IComposableVault
  * @notice Interface for vaults that can compose with other vaults
